@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
-apiInput.value = localStorage.getItem('mall_api_base') || 'https://mrmall-api.onrender.com';
+apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
 const tokenInput = $('accessToken');
 tokenInput.value = localStorage.getItem('mall_access_token') || '';
 
@@ -20,7 +20,10 @@ $('reviewBtn').addEventListener('click', async () => {
       body: JSON.stringify({article, content_type:$('contentType').value, verify_facts:false})
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || '审核失败');
+    if (!resp.ok) {
+      const detail = data && data.detail ? data.detail : ('HTTP ' + resp.status + ' 审核失败');
+      throw new Error(detail);
+    }
     render(data);
     $('status').textContent = '完成';
   } catch (e) {

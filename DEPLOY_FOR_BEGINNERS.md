@@ -1,50 +1,67 @@
-# Mall Content OS Web v0.1.1｜第一次上线教程
+# v0.1.2｜更新已有线上网站
 
-## 0. GitHub 仓库应当长这样
-仓库根目录直接看到：`backend/`、`core/`、`frontend/`、`render.yaml`。不要再套一层项目文件夹。
+你已经有 GitHub + Render + Vercel，不需要重新创建项目。
 
-## 1. 先部署 Render 后端
-1. 登录 Render，New → Web Service，连接 GitHub 仓库。
-2. **Root Directory 留空。** Review Core 在根目录 `core/`，不能把 Root Directory 设置为 `backend`。
-3. Build Command：
-   `pip install -r backend/requirements.txt && python core/review_core/engine/compile_rules.py && python core/review_core/engine/validate_rule_source.py`
-4. Start Command：
-   `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Health Check Path：`/health`
-6. 第一轮环境变量只设置 `LLM_PROVIDER=mock`、`CORS_ORIGINS=*`。
-7. 部署成功后打开 `https://你的地址.onrender.com/health`，应看到 `ok: true`。
+## 1. 更新 GitHub
+用 v0.1.2 文件覆盖仓库中的同名文件并 Commit。
 
-## 2. 再部署 Vercel 前端
-1. Vercel → Add New Project → Import 同一个 GitHub 仓库。
-2. Root Directory 设置为 `frontend`。
-3. Framework Preset 选择 Other / Static（如果 Vercel 自动识别可保持默认）。
-4. Deploy。
-5. 打开网页，把 Render API 地址填入“后端 API 地址”。
+重点文件：
+- `backend/app/llm.py`
+- `backend/app/contracts.py`（新增）
+- `backend/app/review_core.py`
+- `backend/app/main.py`
+- `backend/app/config.py`
+- `core/review_core/portable/prompts/01_rule_batch_evaluator.md`
+- `core/review_core/portable/prompts/02_feedback_composer.md`
+- `core/review_core/portable/prompts/04_router.md`
+- `frontend/app.js`
+- `frontend/index.html`
 
-## 3. MOCK 跑通后再接付费模型
-在 Render Environment 中设置：
+最省事的方式是用 v0.1.2 整包覆盖当前仓库内容。
+
+## 2. Render
+GitHub Commit 后 Render 正常会自动部署。
+
+环境变量继续保留：
 - `LLM_PROVIDER=openai_compatible`
-- `LLM_API_KEY=你的密钥`
-- `LLM_BASE_URL=供应商 OpenAI-compatible API 根地址`
-- `LLM_MODEL=模型名`
-- `APP_ACCESS_TOKEN=你自己生成的一串长随机字符`
+- `LLM_API_KEY=你的 DeepSeek Key`
+- `LLM_BASE_URL=https://api.deepseek.com`
+- `LLM_MODEL=你当前实际使用的模型 ID`
+- `APP_ACCESS_TOKEN=你的访问口令`
+- `CORS_ORIGINS=*`
+- `LLM_TIMEOUT_SECONDS=180`（建议）
+- `LLM_HTTP_RETRIES=2`（建议）
 
-然后在网页“访问口令”里输入同一 `APP_ACCESS_TOKEN`。**不要把模型 API Key 填到网页。**
+不要开启 `LLM_DEBUG_RAW_RESPONSE`，除非排查模型协议问题；原始响应可能包含文章内容。
 
-## 4. 上线后收紧 CORS
-拿到 Vercel 正式网址后，把 Render 的 `CORS_ORIGINS=*` 改为完整网址，例如：
-`https://your-project.vercel.app`
+部署后打开：
+`https://mrmall-api.onrender.com/health`
 
-## 5. Rules 更新
-直接替换 `core/review_core/rules/*.md` 后提交 GitHub。Render 下一次部署会自动：
-1. 编译 Markdown Rules；
-2. 校验 Rule Source；
-3. 生成新的 Registry。
+应看到：
+- `"ok": true`
+- `"version": "0.1.2"`
+- `"provider": "openai_compatible"`
+- `"model": "..."`
 
-## 6. 现阶段明确未包含
-- 数据库 / 历史稿件
-- 多用户登录
-- 外部事实搜索插件
-- 自动保存审稿结果
+## 3. Vercel
+同一个 GitHub Commit 会触发 Vercel 自动部署。
 
-先验证核心审核闭环。
+打开网页，标题上方应看到 `REVIEW CORE v0.1.2`。
+
+## 4. 第一次真实测试
+建议先在网页手动选择文章类型，例如 D，测试真实 Rule Evaluator。
+
+成功后再切回“自动判断”，测试 Router。
+
+这样如果失败，可以明确区分：
+- Router问题；
+- Rule Evaluator问题；
+- Feedback Composer问题。
+
+## 5. 如果仍报错
+网页会直接显示后端的受控错误，例如：
+- 自动判断失败：提示手动选择 A/B/C/D/E；
+- Rule Evaluator 契约失败：中止本次审核，不输出错误结论；
+- Provider 429/5xx：后端有限重试后返回明确错误。
+
+Render Logs 不再需要依赖 Python traceback 才能判断错误阶段。

@@ -1,19 +1,19 @@
-# Test Status v0.1.1
+# TEST STATUS｜v0.1.2
 
-已完成：
-- 48条 Markdown Rules 编译通过；
-- Rule Source Validator 通过；
-- 所有 Rule 文件名为 ASCII、内容 UTF-8；
-- Python 语法检查通过；
-- JSON/YAML 解析通过；
-- FastAPI `/health` 本地 TestClient 返回 200；
-- FastAPI `/api/review` 在 MOCK 模式返回 200；
-- AUTO Router MOCK 链路通过；
-- APP_ACCESS_TOKEN 正确拦截无口令/错误口令，并允许正确口令；
-- Registry hash 可正常返回。
+## 实际执行结果
+- Rules compile：PASS
+- Rule source validation：PASS
+- Python compileall：PASS
+- JSON/YAML parse：PASS
+- Response contract tests：PASS
+- MOCK AUTO integration：PASS
+- FastAPI TestClient /health + /api/review + auth：PASS
+- frontend app.js syntax：PASS
 
-尚未完成：
-- Render 真实云端部署；
-- Vercel 真实云端部署；
-- 真实付费模型 API 的端到端回归；
-- 外部事实搜索插件（本版本未实现）。
+## 未执行
+- 真实 DeepSeek 计费 API 请求：未执行。你的 API Key 不在本交付环境中，也不应提供给交付包。
+- Render/Vercel 真实外网端到端：需你覆盖 GitHub 后由现有线上环境完成最后验收。
+
+## 结论
+本地可验证的软件路径已通过。v0.1.2 仍不能宣称对任何第三方模型/API“绝对零错误”；
+系统的目标是把格式偏差转成受控修复或安全失败，而不是输出未经验证的审稿结果。

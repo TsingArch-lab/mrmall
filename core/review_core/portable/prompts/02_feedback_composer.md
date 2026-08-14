@@ -19,7 +19,20 @@
 7. 如果没有 FAIL Rule，不得制造负面核心诊断。
 
 ## 输出
-严格符合 `feedback_candidate_schema.json`。
+严格符合 `feedback_candidate_schema.json`，只输出一个 JSON 对象。
+
+必须包含全部字段：
+- `final_judgement`
+- `dimension_assessments`
+- `core_diagnosis`
+- `issue_candidates`
+- `strengths`
+
+`core_diagnosis` 如非 null，必须同时包含：
+`text`、`supporting_rule_ids`、`article_evidence`。
+
+每个 `issue_candidates` 元素也必须同时包含这三个字段。
+不得把 `core_diagnosis` 只输出成字符串。
 
 ---
 FINAL_JUDGEMENT:

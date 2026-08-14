@@ -24,6 +24,22 @@
 ## 输出
 严格符合 `rule_evaluation_schema.json`。不要输出 Schema 之外的字段。
 
+必须输出一个 JSON 对象，且包含全部 6 个字段：
+`content_type`、`evaluated_rule_ids`、`passed_rule_ids`、`failed_rules`、`na_rule_ids`、`unresolved_rules`。
+
+即使数组为空，也必须保留字段，例如：
+{
+  "content_type": "D",
+  "evaluated_rule_ids": ["G001"],
+  "passed_rule_ids": ["G001"],
+  "failed_rules": [],
+  "na_rule_ids": [],
+  "unresolved_rules": []
+}
+
+不得用 `pass`、`fails`、`results`、`status_by_rule` 等其他字段替代。
+每一个 supplied Rule ID 必须且只能出现在 PASS / FAIL / NA / UNRESOLVED 中的一处。
+
 ---
 CONTENT_TYPE:
 {{CONTENT_TYPE}}

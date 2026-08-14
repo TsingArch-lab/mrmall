@@ -1,26 +1,37 @@
-# Web v0.1 Architecture
+# Architecture｜Web v0.1.2
 
 ```text
-Browser / Vercel Static Frontend
-        ↓ HTTPS
-FastAPI / Render
-        ↓
-Review Orchestrator
-  ├─ Content Type Router (optional LLM call)
-  ├─ Applicable Rule Compiler (deterministic)
-  ├─ Rule Batch Evaluator (LLM)
-  ├─ Gate Aggregator (deterministic)
-  ├─ Feedback Composer (FAIL-only LLM)
-  └─ Provenance Validation (deterministic)
-        ↓
-LLM Provider Adapter
+Browser
+  ↓
+Vercel static frontend
+  ↓
+Render FastAPI
+  ↓
+Request contract
+  ↓
+Provider adapter (OpenAI-compatible / mock)
+  ↓
+Response normalization + contract validation
+  ↓
+Router (AUTO only)
+  ↓
+Rule Batch Evaluator
+  ↓
+Deterministic Gate
+  ↓
+Feedback Composer
+      ↘ contract failure → deterministic FAIL-only fallback
+  ↓
+Provenance-safe response
 ```
 
-## Invariants
+内容标准仍只有一条合法来源：
 
-- Markdown Rules are the human source of truth.
-- LLM cannot create new quality criteria.
-- No Rule, No Feedback.
-- Gate decisions are deterministic.
-- API keys live on backend only.
-- Provider-specific API details stay inside the Adapter layer.
+```text
+Markdown Rules
+→ Compiler
+→ Registry
+→ Runtime
+```
+
+v0.1.2 新增的“模型响应归一化/修复”属于协议兼容层，不得改变 Rule 语义。
