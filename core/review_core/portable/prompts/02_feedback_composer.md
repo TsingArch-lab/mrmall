@@ -7,7 +7,7 @@
 - FINAL_JUDGEMENT（由程序给定，不得修改）
 - DIMENSION_STATES（由程序给定，不得修改）
 - VERIFICATION_RESULTS（可选）
-- PASSED_STRENGTH_CANDIDATES（可选）
+- PASSED_STRENGTH_CANDIDATES（保留兼容字段；当前正向反馈由独立 Strength Extractor 生成）
 
 ## 硬约束
 1. No Rule, No Feedback。
@@ -17,6 +17,7 @@
 5. 不得以“还能更好”为理由改变最终判断。
 6. 核心诊断只能概括最高严重度、最上游的 FAIL Rule 集合。
 7. 如果没有 FAIL Rule，不得制造负面核心诊断。
+8. `strengths` 在本阶段必须输出空数组；不得自行生成表扬。
 
 ## 输出
 严格符合 `feedback_candidate_schema.json`，只输出一个 JSON 对象。

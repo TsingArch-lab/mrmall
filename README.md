@@ -11,3 +11,6 @@
 - 没有解释为什么、没有决策过程、没有机制。
 
 详见 `RULE_CHANGELOG_v0.1.4.md`。
+
+## v0.1.5 Positive Evidence Layer
+“值得保留”由独立 Strength Extractor 生成：只使用已 PASS 的 strength-eligible Rules，并要求逐条绑定原文证据。正向反馈与 Gate/负面反馈完全解耦。

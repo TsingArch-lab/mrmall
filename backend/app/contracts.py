@@ -173,6 +173,32 @@ def normalize_rule_evaluation(
     if response_type != content_type:
         raise ContractError(f"rule evaluator changed content_type from {content_type} to {response_type}")
 
+    # Malformed FAIL is uncertainty, not a review failure.
+    # A FAIL is only enforceable when the model supplied BOTH exact article evidence
+    # and a narrow explanation of how that evidence matches the existing fail_condition.
+    # If either field is missing, deterministically downgrade it to UNRESOLVED so that
+    # the targeted adjudicator can retry only that Rule instead of aborting the whole review.
+    well_formed_failed = []
+    malformed_unresolved = list(unresolved)
+    for item in failed:
+        rid = item.get("rule_id", "")
+        if rid in supplied and item.get("article_evidence") and item.get("match_explanation"):
+            well_formed_failed.append(item)
+        elif rid in supplied:
+            missing_parts = []
+            if not item.get("article_evidence"):
+                missing_parts.append("article_evidence")
+            if not item.get("match_explanation"):
+                missing_parts.append("match_explanation")
+            malformed_unresolved.append({
+                "rule_id": rid,
+                "why_unresolved": "模型将该 Rule 判为 FAIL，但缺少契约必需字段：" + ", ".join(missing_parts) + "。不得猜测补全，转为 UNRESOLVED 局部复核。",
+            })
+        else:
+            well_formed_failed.append(item)
+    failed = well_formed_failed
+    unresolved = malformed_unresolved
+
     if verification_context is not None:
         from .verification import fail_is_only_unverified
         kept_failed = []

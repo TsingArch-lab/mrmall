@@ -16,7 +16,7 @@ class ReviewRequest(BaseModel):
 class ReviewResponse(BaseModel):
     review_id:str; content_type:str; final_judgement:str
     dimension_states:dict[str,str]; core_diagnosis:str|None
-    issues:list[dict[str,Any]]; strengths:list[str]
+    issues:list[dict[str,Any]]; strengths:list[Any]
     unresolved_rules:list[dict[str,Any]]; failed_rule_ids:list[str]
     model_provider:str; model:str; registry_hash:str
     verification_note:str|None=None

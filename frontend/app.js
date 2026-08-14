@@ -41,7 +41,12 @@ function render(d){
   $('dimensions').innerHTML = Object.entries(d.dimension_states).map(([k,v])=>`<div class="dim"><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   if(d.core_diagnosis){$('diagnosisWrap').classList.remove('hidden');$('diagnosis').textContent=d.core_diagnosis}else{$('diagnosisWrap').classList.add('hidden')}
   $('issues').innerHTML = d.issues.length ? d.issues.map((x,i)=>`<div class="issue"><strong>${i+1}. ${esc(x.text)}</strong><div class="rule">Rule: ${esc((x.supporting_rule_ids||[]).join(', '))}</div>${(x.article_evidence||[]).map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('')}</div>`).join('') : '<p>当前 Rules 未生成负面问题。</p>';
-  $('strengths').innerHTML = (d.strengths||[]).map(x=>`<li>${esc(x)}</li>`).join('') || '<li>暂无。</li>';
+  $('strengths').innerHTML = (d.strengths||[]).map(x=>{
+    if(typeof x === 'string') return `<li>${esc(x)}</li>`;
+    const rules=(x.supporting_rule_ids||[]).length ? `<div class="rule">Rule: ${esc((x.supporting_rule_ids||[]).join(', '))}</div>` : '';
+    const evidence=(x.article_evidence||[]).map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('');
+    return `<li><strong>${esc(x.text||'')}</strong>${rules}${evidence}</li>`;
+  }).join('') || '<li>当前 PASS Rules 未提取出有充分原文证据的“值得保留”内容。</li>';
   if(d.verification_note){$('verifyNote').classList.remove('hidden');$('verifyNote').textContent=d.verification_note}else{$('verifyNote').classList.add('hidden')}
   $('result').scrollIntoView({behavior:'smooth',block:'start'});
 }

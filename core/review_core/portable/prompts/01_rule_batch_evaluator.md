@@ -15,7 +15,7 @@
 1. 只评估 supplied Rule IDs。
 2. 不输出全文总体评论。
 3. PASS：只记录 Rule ID。
-4. FAIL：必须给出原文 evidence，并仅说明 evidence 如何命中该 Rule 的 fail_condition。
+4. FAIL：必须同时给出非空 `article_evidence` 与非空 `match_explanation`；`match_explanation` 只能说明 evidence 如何命中该 Rule 的既有 fail_condition。任何一个字段无法可靠填写时，必须输出 UNRESOLVED，不能保留为 FAIL。
 5. NA：必须能指出该 Rule 的明确例外或确实不适用。
 6. 不确定时输出 UNRESOLVED，不得为了谨慎而 FAIL。
 7. 不得新增、推导、补充任何质量标准。

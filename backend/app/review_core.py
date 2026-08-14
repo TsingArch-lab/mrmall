@@ -23,6 +23,30 @@ REGISTRY = CORE_DIR / "registry" / "compiled_rule_registry.json"
 GATES = CORE_DIR / "portable" / "runtime" / "gate_registry.json"
 PROMPTS = CORE_DIR / "portable" / "prompts"
 
+
+# Rules whose PASS state can support useful author-facing positive feedback.
+# Excluded: verification/global guardrails, conditional反证 rules, final/gate rules,
+# and rules where PASS mostly means "no problem detected" rather than a positive asset.
+STRENGTH_ELIGIBLE_RULE_IDS = {
+    # Strong content-value signals. PASS is necessary but still not sufficient.
+    "T001", "T002", "T003", "T004",
+    "T101", "T102", "T103",
+    "E001", "E101", "E201", "E301", "E401",
+    "I001", "I002", "I004", "I101", "I201",
+    "S001", "S002", "S003", "S005", "S006",
+    "S101", "S201", "S301",
+}
+
+# Every published strength must include at least one anchor Rule whose PASS can represent
+# a distinctive content asset, rather than merely adequate evidence or absence of error.
+# Evidence Rules may support a strength, but cannot create one by themselves.
+STRENGTH_ANCHOR_RULE_IDS = {
+    "T001", "T002", "T003", "T004",
+    "T101", "T102", "T103",
+    "I001", "I002", "I004", "I101", "I201",
+    "S001", "S002", "S005", "S101", "S201", "S301",
+}
+
 DIM_MAP = {
     "TOPIC": "选题价值",
     "EVIDENCE": "证据支撑",
@@ -200,7 +224,7 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
                 f"CONTENT_TYPE 必须是 {content_type}。\n"
                 f"SUPPLIED_RULE_IDS={json.dumps(supplied_ids, ensure_ascii=False)}。\n"
                 "每个 supplied Rule 必须且只能出现在 PASS/FAIL/NA/UNRESOLVED 一个桶中。"
-                "不得新增 Rule ID。FAIL 必须保留原输出中已有的文章证据；没有证据则转为 UNRESOLVED。"
+                "不得新增 Rule ID。FAIL 必须同时保留原输出中已有的 article_evidence 与 match_explanation；任一缺失都必须转为 UNRESOLVED，不得猜测补全。"
             ),
         )
         try:
@@ -352,7 +376,7 @@ def deterministic_feedback_fallback(
             "dimension_assessments": agg["dimension_states"],
             "core_diagnosis": None,
             "issue_candidates": [],
-            "strengths": ["没有触发当前 Rules 定义的阻塞性问题。"],
+            "strengths": [],
         }
 
     reg = rules_by_id()
@@ -386,6 +410,83 @@ def deterministic_feedback_fallback(
         "issue_candidates": issues,
         "strengths": [],
     }
+
+
+async def extract_strengths(
+    article: str,
+    content_type: str,
+    eval_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Extract positive author feedback from selected PASS Rules only.
+
+    This is intentionally separate from negative feedback composition so a model cannot
+    turn free-form praise into a new editorial standard or influence Gate results.
+    """
+    passed = [
+        rid for rid in eval_result.get("passed_rule_ids", [])
+        if rid in STRENGTH_ELIGIBLE_RULE_IDS
+    ]
+    if not passed:
+        return []
+
+    reg = rules_by_id()
+    keys = [
+        "rule_id", "name", "stage", "evaluation_question",
+        "pass_condition", "exceptions",
+    ]
+    strength_rules = [{k: reg[rid].get(k) for k in keys} for rid in passed]
+    prompt = (PROMPTS / "05_strength_extractor.md").read_text(encoding="utf-8")
+    user = _render(
+        prompt,
+        {
+            "CONTENT_TYPE": content_type,
+            "PASSED_STRENGTH_RULES": strength_rules,
+            "ARTICLE": article,
+        },
+    )
+
+    provider = get_provider()
+    try:
+        raw = await provider.generate_json(
+            "你是 STRENGTH_EXTRACTOR。只能从已 PASS 的指定 Rules 提取值得保留内容；No PASS Rule, No Strength。只输出 JSON。",
+            user,
+        )
+        strengths_raw = raw.get("strengths", []) if isinstance(raw, dict) else []
+        if not isinstance(strengths_raw, list):
+            return []
+
+        out: list[dict[str, Any]] = []
+        passed_set = set(passed)
+        for item in strengths_raw[:4]:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("text", "")).strip()
+            support = [str(x).strip() for x in item.get("supporting_rule_ids", []) if str(x).strip()]
+            evidence = [str(x).strip() for x in item.get("article_evidence", []) if str(x).strip()]
+            significant = item.get("significant_asset") is True
+            deletion_harm = str(item.get("deletion_harm", "")).strip()
+            if not text or not support or not evidence or not significant or not deletion_harm:
+                continue
+            if not set(support).issubset(passed_set):
+                continue
+            # PASS is necessary but not sufficient: at least one supporting Rule must be
+            # an anchor capable of representing a distinctive content asset. Evidence-only
+            # or merely "no-error" PASS states cannot generate praise.
+            if not (set(support) & STRENGTH_ANCHOR_RULE_IDS):
+                continue
+            # Positive provenance is stricter than negative prose: every cited excerpt
+            # must literally occur in the submitted article after trimming.
+            if any(ev not in article for ev in evidence):
+                continue
+            out.append({
+                "text": text,
+                "supporting_rule_ids": list(dict.fromkeys(support)),
+                "article_evidence": evidence,
+            })
+        return out
+    except Exception as exc:
+        logger.warning("Strength Extractor failed; returning no strengths: %s", exc)
+        return []
 
 
 async def compose_feedback(
@@ -448,7 +549,11 @@ async def review_article(
     validate_eval(eval_result, content_type)
 
     agg = aggregate(eval_result)
+    strengths = await extract_strengths(article, content_type, eval_result)
     feedback = await compose_feedback(eval_result, agg, verification_context.results)
+    # Positive feedback is produced by its own PASS-grounded extractor, never by the
+    # negative Feedback Composer. It cannot change Gate/final judgement.
+    feedback["strengths"] = strengths
 
     core = feedback.get("core_diagnosis")
     core_text = core.get("text") if isinstance(core, dict) else None

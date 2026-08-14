@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StrengthCandidateBundle",
+  "type": "object",
+  "required": ["strengths"],
+  "properties": {
+    "strengths": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["text", "supporting_rule_ids", "article_evidence", "significant_asset", "deletion_harm"],
+        "properties": {
+          "text": {"type": "string", "minLength": 1},
+          "supporting_rule_ids": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": {"type": "string"}
+          },
+          "article_evidence": {
+            "type": "array", "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "significant_asset": {"type": "boolean"},
+          "deletion_harm": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
