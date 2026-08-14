@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
-apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
+apiInput.value = localStorage.getItem('mall_api_base') || 'https://mrmall-api.onrender.com';
 const tokenInput = $('accessToken');
 tokenInput.value = localStorage.getItem('mall_access_token') || '';
 
