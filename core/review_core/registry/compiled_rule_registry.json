@@ -3,7 +3,7 @@
   "content_semantics_version": "0.4.1-md-source",
   "runtime_version": "0.4.1",
   "single_source_of_truth": "rules/*.md",
-  "generated_at_utc": "2026-08-14T14:08:22.503065+00:00",
+  "generated_at_utc": "2026-08-14T15:53:33.579999+00:00",
   "rule_count": 48,
   "rules": [
     {
@@ -46,17 +46,18 @@
         "E"
       ],
       "severity": "BLOCKER",
-      "evaluation_question": "核心判断能否追溯到具体事实、数据、引语或操作细节？",
-      "pass_condition": "核心判断至少有一条清晰证据链。",
-      "fail_condition": "先有观点，再用零散案例装饰；或判断无法指出来源。",
+      "evaluation_question": "核心判断能否追溯到具体事实、数据、引语、操作细节或明确的项目决策过程？",
+      "pass_condition": "核心判断至少有一条清晰的“事实→推导→判断”链条。商业内容不要求对每个判断完成学术式证明或排除所有替代解释；第一方经营数据、采访和项目操作细节可以作为有效证据，但其证明范围不得被无依据扩大。",
+      "fail_condition": "先有观点，再用零散案例或成绩清单装饰；或大量罗列品牌、活动、销售、客流等结果，却没有解释这些事实如何支持核心判断。",
       "exceptions": [
-        "类型D允许个人立场，但必须明确区分事实与个人判断。"
+        "类型D允许个人立场，但必须明确区分事实与个人判断。",
+        "第一方材料本身不构成失败；只有当它被直接当作“企业很成功/能力很强”的自我证明，且缺少具体事实与推导时，才构成问题。"
       ],
-      "semantic_hash": "sha256:c9943eeb5a37651ba7f65765725f4bfa6f9bdf26abce101b010db9b7c02c6b8b",
+      "semantic_hash": "sha256:6a8f2e22590941e673ed759c4b4d737108850f75cb7a083e738470ccb3bfe895",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "先有观点，再用零散案例装饰；或判断无法指出来源。",
+        "allowed_feedback_meaning": "先有观点，再用零散案例或成绩清单装饰；或大量罗列品牌、活动、销售、客流等结果，却没有解释这些事实如何支持核心判断。",
         "may_create_new_criterion": false
       }
     },
@@ -224,17 +225,17 @@
       ],
       "severity": "BLOCKER",
       "evaluation_question": "是否有现实路径获得具体数字、原话或操作细节？",
-      "pass_condition": "存在可获得的核心证据，不主要依赖企业PR自述。",
-      "fail_condition": "只能依赖软文/预告/二手概括来支撑核心判断。",
+      "pass_condition": "存在可获得的具体数字、原话、操作细节、现场观察或原始文件，能够支撑文章展开分析。第一方经营数据和直接采访可作为有效核心证据。",
+      "fail_condition": "只能获得抽象PR话术、成绩清单或二手概括，无法还原任何具体动作、决策过程或经营事实。",
       "exceptions": [
         "类型C以权威原始公开文件为核心证据。",
         "类型E以权威、及时、完整的信息源为核心证据。"
       ],
-      "semantic_hash": "sha256:ec33b908c8f65f4234cbe3cd70105e3a6b72010453136a50b618e3e70e9ffb40",
+      "semantic_hash": "sha256:c1ff9d152ad4b706e5e6e8967dbe0cf2470eaa0f73b1f3a6e263d297fbceb1a5",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "只能依赖软文/预告/二手概括来支撑核心判断。",
+        "allowed_feedback_meaning": "只能获得抽象PR话术、成绩清单或二手概括，无法还原任何具体动作、决策过程或经营事实。",
         "may_create_new_criterion": false
       }
     },
@@ -315,17 +316,18 @@
       ],
       "severity": "BLOCKER",
       "evaluation_question": "是否存在足够具体、可追溯的直接证据支撑核心判断？",
-      "pass_condition": "至少具备具体数字、操作细节、官方原始文件、现场观察、直接采访等证据中的两类，并且足以支撑核心判断。",
-      "fail_condition": "核心判断主要依赖抽象描述、PR话术或不可追溯的二手概括。",
+      "pass_condition": "至少具备具体数字、操作细节、官方原始文件、现场观察、直接采访等证据中的两类，或虽不足两类但单一证据来源足够具体、连续，能够支撑核心判断的主要推导。",
+      "fail_condition": "核心判断主要依赖抽象描述、PR口号、成绩罗列或不可追溯的二手概括，无法形成“事实→推导→判断”的链条。",
       "exceptions": [
         "不强制要求必须存在采访原话。",
+        "不要求每个事实都由独立第三方验证。项目方提供的具体经营数据、决策过程和操作细节可以作为直接证据。",
         "若某类证据缺失，但其他直接证据已经足够支撑核心判断，不构成FAIL。"
       ],
-      "semantic_hash": "sha256:ff3d2f8e2b3976884d8e71b535c29403c091d8b71748ac4b56a615cc7d56c0f0",
+      "semantic_hash": "sha256:ec0f4e84cacd6e4114b98277391e40240943d5ee1a0bccd66f95f0dd2fcb19bf",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "核心判断主要依赖抽象描述、PR话术或不可追溯的二手概括。",
+        "allowed_feedback_meaning": "核心判断主要依赖抽象描述、PR口号、成绩罗列或不可追溯的二手概括，无法形成“事实→推导→判断”的链条。",
         "may_create_new_criterion": false
       }
     },
@@ -340,15 +342,18 @@
         "B"
       ],
       "severity": "BLOCKER",
-      "evaluation_question": "核心判断是否主要由企业自己对自己的成功描述来证明？",
-      "pass_condition": "企业材料只作背景，核心判断由独立事实、直接采访、现场观察或可核查数据支撑。",
-      "fail_condition": "循环使用企业自述证明企业成功。",
-      "exceptions": [],
-      "semantic_hash": "sha256:241380347e413dc9c05c60df144cf3c8384d9b5ae9964e2e1ec935d898795600",
+      "evaluation_question": "核心判断是否把企业自己的评价性表述或成绩罗列，直接当成了成功与能力的证明？",
+      "pass_condition": "企业一手材料可以作为证据；只要正文进一步使用具体数据、动作、决策过程或案例关系完成推导，就不属于“自证”。不要求为了成立而额外寻找独立第三方背书。",
+      "fail_condition": "核心判断主要依赖“我们专业/成功/领先/有能力”等企业自我评价，或把销售、客流、首店、奖项等成绩简单罗列后直接推出“能力强/模式成功”，中间缺少实质推导。",
+      "exceptions": [
+        "项目方提供的客流、销售、租金、招商、改造收益等具体经营数据，不因来源于项目方而自动失效。",
+        "只有当第一方材料超出其可证明范围，被直接用于证明更高阶能力或普遍规律时，才触发本规则。"
+      ],
+      "semantic_hash": "sha256:f5896272ed768d391c1528680956937a7dd0c38de913f92270e2a112c3d10251",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "循环使用企业自述证明企业成功。",
+        "allowed_feedback_meaning": "核心判断主要依赖“我们专业/成功/领先/有能力”等企业自我评价，或把销售、客流、首店、奖项等成绩简单罗列后直接推出“能力强/模式成功”，中间缺少实质推导。",
         "may_create_new_criterion": false
       }
     },
@@ -362,19 +367,21 @@
         "A",
         "B"
       ],
-      "severity": "MAJOR",
-      "evaluation_question": "当前证据是否存在需要额外反向验证的明显风险？",
-      "pass_condition": "没有明显风险时可N/A；存在强因果、强外推、证据冲突或替代解释时，已进行必要检查。",
-      "fail_condition": "明显需要验证却完全未检查，导致结论强度超过证据。",
+      "severity": "MINOR",
+      "evaluation_question": "当前核心判断是否存在会实质改变结论的明显风险、反例或替代解释，而正文完全没有意识到？",
+      "pass_condition": "一般性的成功案例、经营复盘和机制分析不要求额外配置失败案例或第三方反证。只有当存在与核心结论直接冲突、足以改变结论的明显信息时，才需要进一步检查或降低判断强度。",
+      "fail_condition": "存在显而易见、且会直接动摇核心结论的反例、风险、证据冲突或替代解释，文章却完全忽略，并因此把结论写得明显过满。",
       "exceptions": [
-        "不要求每篇文章必须找到反例。",
-        "不要求把反向验证结果强制写进正文。"
+        "不要求每篇文章必须找到失败案例。",
+        "不要求独立第三方验证每个经营判断。",
+        "不要求把所有反向验证结果写进正文。",
+        "仅仅“还可以有别的解释”不构成FAIL；替代解释必须足以实质改变核心结论。"
       ],
-      "semantic_hash": "sha256:a0b3d6bc0f9638f328e89e5883ddf1ae7f646cfd6fd0c7cc7deb56913e917076",
+      "semantic_hash": "sha256:8ce03d33ea6107a541cf1f1f6cf54c90d67729d0574ef04a7e71960d790d968a",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "明显需要验证却完全未检查，导致结论强度超过证据。",
+        "allowed_feedback_meaning": "存在显而易见、且会直接动摇核心结论的反例、风险、证据冲突或替代解释，文章却完全忽略，并因此把结论写得明显过满。",
         "may_create_new_criterion": false
       }
     },
@@ -500,14 +507,14 @@
       ],
       "severity": "BLOCKER",
       "evaluation_question": "如果同行追问‘为什么’，能否回答出具体X如何导致Y？",
-      "pass_condition": "判断包含明确机制链条，不只是结果或形容词。",
-      "fail_condition": "专业、成功、年轻化、长期主义等抽象标签替代机制。",
+      "pass_condition": "至少有一个核心判断明确解释“某个具体动作/选择/机制如何带来某种结果或经营含义”；不要求把所有结果都证明到唯一因果。",
+      "fail_condition": "专业、成功、年轻化、长期主义等抽象标签替代机制；或全文主要罗列品牌、活动、销售、客流、首店等成绩，却没有解释它们之间的关系以及为什么这些事实说明核心判断。",
       "exceptions": [],
-      "semantic_hash": "sha256:4905f5a242b71b6968ad5377e181d5d12b3a113670e70a198898c17ae65075cc",
+      "semantic_hash": "sha256:58fdcde2899423be8b1898c22b27ffd78ede8c4217d1038b24440cbfaae2a40f",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "专业、成功、年轻化、长期主义等抽象标签替代机制。",
+        "allowed_feedback_meaning": "专业、成功、年轻化、长期主义等抽象标签替代机制；或全文主要罗列品牌、活动、销售、客流、首店等成绩，却没有解释它们之间的关系以及为什么这些事实说明核心判断。",
         "may_create_new_criterion": false
       }
     },
@@ -546,16 +553,20 @@
         "A",
         "B"
       ],
-      "severity": "MAJOR",
-      "evaluation_question": "比较、话语拆解、多案例、历史、数据五个追问是否都被检查过？",
-      "pass_condition": "五问均有回答或明确记录无有效结果。",
-      "fail_condition": "只沿着作者最初思路单线推进。",
-      "exceptions": [],
-      "semantic_hash": "sha256:fce61cda1a627f1af934fb9a31d7dee5304d1d495a7e8a4c9c16a7da4cd57902",
+      "severity": "MINOR",
+      "evaluation_question": "文章是否明显跳过了必要的探索，只沿着一个既定宣传口径或最初结论单线推进？",
+      "pass_condition": "五个追问是探索工具，不是成稿必须逐项展示的清单。成稿中只要能够看到至少两种不同角度的有效推导，或已有证据足以形成具体机制判断，即视为通过。",
+      "fail_condition": "全文只有单一路径：重复企业口径、重复同一类成绩或重复同一个案例结论，没有比较、拆解、关系解释、历史/数据校验中的任何有效扩展。",
+      "exceptions": [
+        "不要求五个追问都在正文中出现。",
+        "不能因为成稿没有呈现某一追问，就反推作者“没有检查过”。",
+        "若素材本身单一但已经足以形成清晰机制判断，不构成FAIL。"
+      ],
+      "semantic_hash": "sha256:29362d033bd6046b642a4ece386038158ee69e95597b799f36b191e886144a9c",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "只沿着作者最初思路单线推进。",
+        "allowed_feedback_meaning": "全文只有单一路径：重复企业口径、重复同一类成绩或重复同一个案例结论，没有比较、拆解、关系解释、历史/数据校验中的任何有效扩展。",
         "may_create_new_criterion": false
       }
     },
@@ -573,16 +584,16 @@
       ],
       "severity": "BLOCKER",
       "evaluation_question": "核心判断是否只是把前文事实换一组抽象词重新说一遍？",
-      "pass_condition": "判断对事实进行了机制解释、关系解释或决策解释。",
-      "fail_condition": "事实→同义概括，没有信息增量。",
+      "pass_condition": "判断对事实进行了机制解释、关系解释或决策解释，产生了事实清单之外的信息增量。",
+      "fail_condition": "事实→同义概括，没有信息增量；或把“做了很多/成绩很好/品牌很多”换成“体系能力强/运营优秀/形成生态”等抽象标签，没有解释中间机制。",
       "exceptions": [
         "类型E不适用。"
       ],
-      "semantic_hash": "sha256:df68434a7dee48ff57bc50fe6d2035a025a8911c7dad318e0da0e01f4825b9be",
+      "semantic_hash": "sha256:eebefc6f99f2c5d010c5ba087a9280166078fc69e334e6cc0847d04cc3821637",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "事实→同义概括，没有信息增量。",
+        "allowed_feedback_meaning": "事实→同义概括，没有信息增量；或把“做了很多/成绩很好/品牌很多”换成“体系能力强/运营优秀/形成生态”等抽象标签，没有解释中间机制。",
         "may_create_new_criterion": false
       }
     },
@@ -598,18 +609,20 @@
         "C",
         "D"
       ],
-      "severity": "BLOCKER",
-      "evaluation_question": "当前措辞的确定性，是否高于现有证据能够支持的程度？",
-      "pass_condition": "事实、推断、作者判断被清楚区分；相关性不被写成未经证明的因果；局部案例不被无依据外推为普遍规律。",
-      "fail_condition": "证据只支持‘可能/呈现出/倾向于’，文章却写成‘就是/决定了/证明了/必然导致’。",
+      "severity": "MAJOR",
+      "evaluation_question": "核心或关键判断的措辞强度，是否明显高于文章现有事实链能够合理支持的程度？",
+      "pass_condition": "只要具体事实、案例和决策过程能够形成合理推导，就允许作者作出有力度的商业判断，不要求排除所有其他解释。局部修辞略强、带有评论性或传播性的表达，不因不够“学术严谨”而自动失败。",
+      "fail_condition": "文章从有限事实直接跳到决定性、唯一性、普遍性结论，且这个跳跃会实质改变读者对核心判断的理解；例如仅凭一个结果就断言某能力必然成立、某模式普遍有效。",
       "exceptions": [
-        "若有直接证据、充分时间链或高度一致的多源事实支撑，可使用更强判断。"
+        "若核心机制有连续的具体动作、结果或多处材料支撑，可以使用较强判断。",
+        "“领先、成功、最重要、唯一”等强词需要与文章核心证据相匹配，但个别宣传性措辞不应自动阻塞全文。",
+        "仅存在其他可能解释，不等于当前判断失败。"
       ],
-      "semantic_hash": "sha256:e935a0feed4e4f349caefa11e5ad49a335a0bb1a25740bd5c043954a0db13eea",
+      "semantic_hash": "sha256:c19ee77cd24cbc2c4a6f9cf3afc9e4d77b8b4b6a1360095d80e12b1c71ab9d1d",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "证据只支持‘可能/呈现出/倾向于’，文章却写成‘就是/决定了/证明了/必然导致’。",
+        "allowed_feedback_meaning": "文章从有限事实直接跳到决定性、唯一性、普遍性结论，且这个跳跃会实质改变读者对核心判断的理解；例如仅凭一个结果就断言某能力必然成立、某模式普遍有效。",
         "may_create_new_criterion": false
       }
     },
@@ -625,18 +638,21 @@
         "C",
         "D"
       ],
-      "severity": "MAJOR",
-      "evaluation_question": "当前判断是否触发了需要额外检查反例/风险/替代解释的条件？",
-      "pass_condition": "未触发则N/A；触发后，作者已检查相关反例/局限/替代解释，并据此校准判断强度。",
-      "fail_condition": "触发条件明显存在，却完全未检查，且当前结论因此显得过度确定。",
+      "severity": "MINOR",
+      "evaluation_question": "是否存在一个明确且有现实依据的替代解释/风险，足以让当前核心判断发生实质变化？",
+      "pass_condition": "没有这样的强替代解释时N/A。普通商业案例不要求为了完整性主动寻找失败案例；有合理证据链即可形成判断。",
+      "fail_condition": "存在文章材料本身已经暴露、或常识上非常直接的重要替代解释/风险，若纳入会显著改变核心判断，但文章完全跳过。",
       "exceptions": [
-        "不要求为了形式完整而加入固定反面段落。"
+        "不要求为了形式完整加入反面段落。",
+        "不要求证明当前解释是唯一解释。",
+        "不要求第三方反证。",
+        "“还可能有别的原因”这种抽象可能性不能触发FAIL。"
       ],
-      "semantic_hash": "sha256:d87cd61e44302dba24c04f000029996f576dc9b9d45f3875ee4ddf292ff4d8e5",
+      "semantic_hash": "sha256:69b6d6a5130994c8780041605adb8f15d52acd096a627191e41b6609c1a23794",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "触发条件明显存在，却完全未检查，且当前结论因此显得过度确定。",
+        "allowed_feedback_meaning": "存在文章材料本身已经暴露、或常识上非常直接的重要替代解释/风险，若纳入会显著改变核心判断，但文章完全跳过。",
         "may_create_new_criterion": false
       }
     },
@@ -740,16 +756,17 @@
       ],
       "severity": "BLOCKER",
       "evaluation_question": "文章是否完成设问→证据→推导→收束判断？",
-      "pass_condition": "核心问题、证据、推导和判断形成完整闭环；反例/风险/替代解释仅按I006条件触发。",
-      "fail_condition": "缺少核心问题、证据、推导或收束判断中的任一关键环节。",
+      "pass_condition": "核心问题、具体证据、必要推导和判断形成可理解的闭环。文章可以使用多个案例或成绩，但每一组核心材料都应承担解释、比较、递进或验证中的至少一种功能。",
+      "fail_condition": "缺少核心问题、证据、推导或收束判断中的任一关键环节；尤其是正文主要由品牌/项目/成绩清单构成，段落之间只在累加“更多、更强、更成功”，没有形成机制推导。",
       "exceptions": [
-        "反证不再作为每篇文章的固定结构要求。"
+        "反证不再作为每篇文章的固定结构要求。",
+        "商业合作稿允许使用较多正向案例，只要案例之间存在清晰的分析功能，而非纯成绩堆砌。"
       ],
-      "semantic_hash": "sha256:d231d2d9c97f7529b91230acefd4fb0ec9e648a1b7626632ad5fa7c448f1a74a",
+      "semantic_hash": "sha256:a706deec82ff6329143cf5d31c25f9d3d5ebe0a9e621d95ad231a8a6ac157e25",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "缺少核心问题、证据、推导或收束判断中的任一关键环节。",
+        "allowed_feedback_meaning": "缺少核心问题、证据、推导或收束判断中的任一关键环节；尤其是正文主要由品牌/项目/成绩清单构成，段落之间只在累加“更多、更强、更成功”，没有形成机制推导。",
         "may_create_new_criterion": false
       }
     },
@@ -818,19 +835,21 @@
         "C",
         "D"
       ],
-      "severity": "MAJOR",
-      "evaluation_question": "当前核心判断是否触发了反例/风险/替代解释检查，且这些内容是否有必要进入正文才能避免误导？",
-      "pass_condition": "未触发则N/A；触发后，仅在其会实质改变读者对结论边界的理解时写入正文。",
-      "fail_condition": "存在明显会改变结论边界的重要局限，却完全省略，导致正文结论显得过度确定。",
+      "severity": "MINOR",
+      "evaluation_question": "正文是否省略了一个已经明显存在、且足以误导读者理解核心结论边界的重要局限？",
+      "pass_condition": "一般情况下N/A。文章不需要专门设置反面章节；只要核心判断没有因为省略重大边界而产生实质误导，就视为通过。",
+      "fail_condition": "文章材料本身已经显示某个关键局限/风险会改变核心结论，但正文完全略去，导致读者被引向明显过度的判断。",
       "exceptions": [
         "不要求固定反面段落。",
-        "不要求为了形式上的客观而面面俱到。"
+        "不要求为了形式上的客观而面面俱到。",
+        "不要求失败案例。",
+        "普通的适用边界、尚待观察或“可能还有其他原因”不构成FAIL。"
       ],
-      "semantic_hash": "sha256:2ee53c0c57d8067236753233dfdfbbf48f0e9a698322582d2424d45eba2f58d2",
+      "semantic_hash": "sha256:d894265bb374182beeb73f8a8156625c6155ae69eaee00724291acc4272de420",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "存在明显会改变结论边界的重要局限，却完全省略，导致正文结论显得过度确定。",
+        "allowed_feedback_meaning": "文章材料本身已经显示某个关键局限/风险会改变核心结论，但正文完全略去，导致读者被引向明显过度的判断。",
         "may_create_new_criterion": false
       }
     },
@@ -1178,18 +1197,21 @@
         "E"
       ],
       "severity": "BLOCKER",
-      "evaluation_question": "全文最终判断的确定性是否与证据强度匹配？",
-      "pass_condition": "事实、推断和判断边界清楚；没有为了显得深刻而把可能性写成确定性。",
-      "fail_condition": "存在明显过度归因、过度外推或虚构确定性。",
-      "exceptions": [],
-      "semantic_hash": "sha256:8ba8344e9e66b280791593dac18d7055535978c45b65878afe28e284248065fd",
+      "evaluation_question": "全文最终的核心判断，是否存在一个没有现有证据链就无法成立的重大跳跃？",
+      "pass_condition": "正文已完成“事实→推导→判断”的基本闭环。允许有评论性、有力度的商业判断，也允许证据并非学术意义上的排他证明；只要核心结论能被现有材料合理解释即可。",
+      "fail_condition": "核心结论主要靠口号、企业自评、成绩清单或未经推导的因果/普遍化跳跃成立；一旦拿掉这一步跳跃，全文核心判断就明显无法成立。",
+      "exceptions": [
+        "局部措辞偏满、单个句子略强、反证讨论不充分，不单独触发F003 BLOCKER，应由I005/E003/I006/S004按对应级别处理。",
+        "不要求每篇文章完成第三方验证或排除所有替代解释。"
+      ],
+      "semantic_hash": "sha256:d58d693a449c4d66473189a414d65e90f9dba37267c603211ca878d31271819f",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "存在明显过度归因、过度外推或虚构确定性。",
+        "allowed_feedback_meaning": "核心结论主要靠口号、企业自评、成绩清单或未经推导的因果/普遍化跳跃成立；一旦拿掉这一步跳跃，全文核心判断就明显无法成立。",
         "may_create_new_criterion": false
       }
     }
   ],
-  "registry_semantic_hash": "sha256:b9b0009fd9f6c9a9483ef925f2bdf0f9120f6a1bb75545289691d810bebeeab2"
+  "registry_semantic_hash": "sha256:c0171ef4711d2638044017f7d73e992082d24660e2e4015255f5513d8142509b"
 }

@@ -1,7 +1,13 @@
-# Mall Content OS Web v0.1.3
+# Mall Content OS Web v0.1.4
 
-Review Correctness Patch。没有新增或修改任何内容质量 Rule。
+本版为 **Argumentation Calibration**。
 
-- 未核验 ≠ 事实错误：NOT_RUN 时，仅因“无法核实/缺来源”产生的 G001/G002 FAIL 转为 UNRESOLVED。
-- 后台 Rule 粒度 ≠ 作者端问题数量：同源 FAIL 预聚类；F001/F002 等 Gate 后果不单独形成作者问题。
-- Markdown Rules、severity、Gate 阈值均未改变。
+审核标准从“证明式”调整为“解释式”：商业文章必须有事实→推导→判断，但不要求像学术论文一样为每个判断配置第三方验证、失败案例和排他因果证明。
+
+同时强化对真正低质量内容的拦截：
+- 成绩/品牌/活动清单式堆砌；
+- 企业自我评价直接当能力证明；
+- 事实后只贴“专业/成功/体系能力”等标签；
+- 没有解释为什么、没有决策过程、没有机制。
+
+详见 `RULE_CHANGELOG_v0.1.4.md`。
