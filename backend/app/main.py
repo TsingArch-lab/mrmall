@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
@@ -16,7 +17,7 @@ from .review_core import registry_hash, review_article
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mall_content_os.api")
 
-app = FastAPI(title="Mall Content OS Review API", version="0.1.4")
+app = FastAPI(title="Mall Content OS Review API", version="0.1.6.1")
 
 origins = (
     ["*"]
@@ -45,7 +46,7 @@ def health():
     return {
         "ok": True,
         "service": "mall-content-os-review",
-        "version": "0.1.4",
+        "version": "0.1.6.1",
         "registry_hash": registry_hash(),
         "provider": settings.llm_provider,
         "model": settings.llm_model or "mock",
@@ -58,8 +59,12 @@ async def review(
     authorization: str | None = Header(default=None),
 ):
     check_token(authorization)
+    request_started = time.perf_counter()
+    logger.info("[api] /api/review start content_type=%s article_chars=%d", req.content_type, len(req.article))
     try:
-        return await review_article(req.article, req.content_type, req.verify_facts)
+        result = await review_article(req.article, req.content_type, req.verify_facts)
+        logger.info("[api] /api/review done elapsed=%.2fs final=%s", time.perf_counter() - request_started, result.get("final_judgement"))
+        return result
     except LLMError as exc:
         # Controlled model/provider/contract failure: safe to show concise message to operator.
         logger.warning("Review LLM failure: %s", exc)

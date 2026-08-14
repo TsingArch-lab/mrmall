@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -532,8 +533,24 @@ def registry_hash():
 async def review_article(
     article: str, content_type: str, verify_facts: bool = False
 ):
+    review_started = time.perf_counter()
+    requested_type = content_type
+    logger.info(
+        "[review] start content_type=%s article_chars=%d verify_facts=%s",
+        requested_type,
+        len(article),
+        verify_facts,
+    )
+
     if content_type == "AUTO":
+        t0 = time.perf_counter()
+        logger.info("[review] route_content_type start")
         content_type = await route_content_type(article)
+        logger.info(
+            "[review] route_content_type done elapsed=%.2fs resolved_type=%s",
+            time.perf_counter() - t0,
+            content_type,
+        )
 
     verification_results: list[dict[str, Any]] = []
     verification_context = make_verification_context(verify_facts, verification_results)
@@ -543,14 +560,60 @@ async def review_article(
         "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
     )
 
+    t0 = time.perf_counter()
+    logger.info("[review] evaluate_rules start content_type=%s", content_type)
     eval_result = await evaluate_rules(article, content_type, verification_context)
-    validate_eval(eval_result, content_type)
-    eval_result = await adjudicate_unresolved(article, content_type, eval_result, verification_context)
+    logger.info(
+        "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d",
+        time.perf_counter() - t0,
+        len(eval_result.get("failed_rules", [])),
+        len(eval_result.get("unresolved_rules", [])),
+    )
     validate_eval(eval_result, content_type)
 
+    t0 = time.perf_counter()
+    logger.info(
+        "[review] adjudicate_unresolved start unresolved=%d",
+        len(eval_result.get("unresolved_rules", [])),
+    )
+    eval_result = await adjudicate_unresolved(
+        article, content_type, eval_result, verification_context
+    )
+    logger.info(
+        "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d",
+        time.perf_counter() - t0,
+        len(eval_result.get("unresolved_rules", [])),
+    )
+    validate_eval(eval_result, content_type)
+
+    t0 = time.perf_counter()
+    logger.info("[review] aggregate start")
     agg = aggregate(eval_result)
+    logger.info(
+        "[review] aggregate done elapsed=%.2fs final=%s failed=%d",
+        time.perf_counter() - t0,
+        agg["final_judgement"],
+        len(agg["failed_rule_ids"]),
+    )
+
+    t0 = time.perf_counter()
+    logger.info("[review] extract_strengths start")
     strengths = await extract_strengths(article, content_type, eval_result)
+    logger.info(
+        "[review] extract_strengths done elapsed=%.2fs strengths=%d",
+        time.perf_counter() - t0,
+        len(strengths),
+    )
+
+    t0 = time.perf_counter()
+    logger.info("[review] compose_feedback start")
     feedback = await compose_feedback(eval_result, agg, verification_context.results)
+    logger.info(
+        "[review] compose_feedback done elapsed=%.2fs issues=%d",
+        time.perf_counter() - t0,
+        len(feedback.get("issue_candidates", [])),
+    )
+
     # Positive feedback is produced by its own PASS-grounded extractor, never by the
     # negative Feedback Composer. It cannot change Gate/final judgement.
     feedback["strengths"] = strengths
@@ -558,7 +621,7 @@ async def review_article(
     core = feedback.get("core_diagnosis")
     core_text = core.get("text") if isinstance(core, dict) else None
 
-    return {
+    result = {
         "review_id": str(uuid.uuid4()),
         "content_type": content_type,
         "final_judgement": agg["final_judgement"],
@@ -573,3 +636,12 @@ async def review_article(
         "registry_hash": registry_hash(),
         "verification_note": verification_note,
     }
+
+    logger.info(
+        "[review] complete elapsed=%.2fs final=%s issues=%d strengths=%d",
+        time.perf_counter() - review_started,
+        result["final_judgement"],
+        len(result["issues"]),
+        len(result["strengths"]),
+    )
+    return result
