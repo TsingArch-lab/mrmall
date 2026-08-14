@@ -16,7 +16,7 @@ from .review_core import registry_hash, review_article
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mall_content_os.api")
 
-app = FastAPI(title="Mall Content OS Review API", version="0.1.2")
+app = FastAPI(title="Mall Content OS Review API", version="0.1.3")
 
 origins = (
     ["*"]
@@ -45,7 +45,7 @@ def health():
     return {
         "ok": True,
         "service": "mall-content-os-review",
-        "version": "0.1.2",
+        "version": "0.1.3",
         "registry_hash": registry_hash(),
         "provider": settings.llm_provider,
         "model": settings.llm_model or "mock",

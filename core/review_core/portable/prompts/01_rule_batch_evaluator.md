@@ -50,5 +50,14 @@ APPLICABLE_RULES_COMPACT:
 VERIFICATION_RESULTS:
 {{VERIFICATION_RESULTS}}
 
+VERIFICATION_EXECUTION_GUARD:
+{{VERIFICATION_GUARD}}
+
 ARTICLE:
 {{ARTICLE}}
+
+
+## 事实核验状态强制约束
+- NOT_RUN 时，“无法核实/缺来源/没有搜索结果”不得直接构成事实类 FAIL。
+- 依赖外部核验且材料不足时用 UNRESOLVED。
+- 只有文章内部事实矛盾、用户材料冲突或 VERIFICATION_RESULTS 明确证明错误时，才可据事实错误判 FAIL。

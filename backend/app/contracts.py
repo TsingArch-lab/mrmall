@@ -111,6 +111,7 @@ def normalize_rule_evaluation(
     *,
     content_type: str,
     supplied_rule_ids: list[str],
+    verification_context=None,
 ) -> dict[str, Any]:
     d = _unwrap_dict(data)
     supplied = set(supplied_rule_ids)
@@ -171,6 +172,21 @@ def normalize_rule_evaluation(
     response_type = normalize_content_type(d.get("content_type")) or content_type
     if response_type != content_type:
         raise ContractError(f"rule evaluator changed content_type from {content_type} to {response_type}")
+
+    if verification_context is not None:
+        from .verification import fail_is_only_unverified
+        kept_failed = []
+        guarded_unresolved = list(unresolved)
+        for item in failed:
+            if fail_is_only_unverified(item["rule_id"], item.get("match_explanation", ""), verification_context):
+                guarded_unresolved.append({
+                    "rule_id": item["rule_id"],
+                    "why_unresolved": "外部事实核验未执行；仅凭‘无法核实/缺乏来源’不能判定该 Rule FAIL。",
+                })
+            else:
+                kept_failed.append(item)
+        failed = kept_failed
+        unresolved = guarded_unresolved
 
     result = {
         "content_type": content_type,

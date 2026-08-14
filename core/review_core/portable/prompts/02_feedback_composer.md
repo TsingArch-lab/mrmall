@@ -44,8 +44,19 @@ DIMENSION_STATES:
 FAILED_RULES_ONLY:
 {{FAILED_RULES_ONLY}}
 
+FAILED_RULE_CLUSTERS:
+{{FAILED_RULE_CLUSTERS}}
+
 VERIFICATION_RESULTS:
 {{VERIFICATION_RESULTS}}
 
 PASSED_STRENGTH_CANDIDATES:
 {{PASSED_STRENGTH_CANDIDATES}}
+
+
+## 作者端问题聚类强制约束
+1. 后台多个 FAIL Rule 不等于作者端多个问题。
+2. 同一 FAILED_RULE_CLUSTERS 默认只输出一个作者问题，一个问题可绑定多个 Rule IDs。
+3. final_judgement、severity、BLOCKER、Gate 结果不得包装成独立作者问题。
+4. 不得出现“上游 BLOCKER 未解决”这类仅复述 Gate 后果的问题。
+5. Cluster diagnosis 含义不得超出 supporting FAIL Rules。

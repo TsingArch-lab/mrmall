@@ -14,6 +14,8 @@ from .contracts import (
     normalize_rule_evaluation,
 )
 from .llm import LLMError, get_provider
+from .verification import make_verification_context, verification_guard_text
+from .feedback_clustering import cluster_failed_rules
 
 logger = logging.getLogger("mall_content_os.review")
 
@@ -161,7 +163,7 @@ async def route_content_type(article: str) -> str:
             ) from exc
 
 
-async def evaluate_rules(article: str, content_type: str, verification_results: list[dict[str, Any]]):
+async def evaluate_rules(article: str, content_type: str, verification_context):
     provider = get_provider()
     rules = compact_rules(content_type)
     supplied_ids = [r["rule_id"] for r in rules]
@@ -171,7 +173,8 @@ async def evaluate_rules(article: str, content_type: str, verification_results: 
         {
             "CONTENT_TYPE": content_type,
             "APPLICABLE_RULES_COMPACT": rules,
-            "VERIFICATION_RESULTS": verification_results,
+            "VERIFICATION_RESULTS": verification_context.results,
+            "VERIFICATION_GUARD": verification_guard_text(verification_context),
             "ARTICLE": article,
         },
     )
@@ -182,7 +185,7 @@ async def evaluate_rules(article: str, content_type: str, verification_results: 
     )
     try:
         return normalize_rule_evaluation(
-            raw, content_type=content_type, supplied_rule_ids=supplied_ids
+            raw, content_type=content_type, supplied_rule_ids=supplied_ids, verification_context=verification_context
         )
     except ContractError as first_exc:
         schema = (CORE_DIR / "portable" / "schemas" / "rule_evaluation_schema.json").read_text(
@@ -202,7 +205,7 @@ async def evaluate_rules(article: str, content_type: str, verification_results: 
         )
         try:
             return normalize_rule_evaluation(
-                repaired, content_type=content_type, supplied_rule_ids=supplied_ids
+                repaired, content_type=content_type, supplied_rule_ids=supplied_ids, verification_context=verification_context
             )
         except ContractError as exc:
             raise LLMError(
@@ -212,7 +215,7 @@ async def evaluate_rules(article: str, content_type: str, verification_results: 
 
 
 async def adjudicate_unresolved(
-    article: str, content_type: str, eval_result: dict[str, Any]
+    article: str, content_type: str, eval_result: dict[str, Any], verification_context
 ):
     unresolved = eval_result.get("unresolved_rules", [])
     if not unresolved:
@@ -237,7 +240,8 @@ async def adjudicate_unresolved(
         {
             "CONTENT_TYPE": content_type,
             "APPLICABLE_RULES_COMPACT": target_rules,
-            "VERIFICATION_RESULTS": [],
+            "VERIFICATION_RESULTS": verification_context.results,
+            "VERIFICATION_GUARD": verification_guard_text(verification_context),
             "ARTICLE": article,
         },
     )
@@ -249,7 +253,7 @@ async def adjudicate_unresolved(
     )
     try:
         result = normalize_rule_evaluation(
-            raw, content_type=content_type, supplied_rule_ids=unresolved_ids
+            raw, content_type=content_type, supplied_rule_ids=unresolved_ids, verification_context=verification_context
         )
     except ContractError:
         # Adjudication is optional. Fail-safe means preserve unresolved, not fail the review.
@@ -393,34 +397,32 @@ async def compose_feedback(
     if not failed:
         return deterministic_feedback_fallback(eval_result, agg)
 
+    reg = rules_by_id()
+    clusters = cluster_failed_rules(failed, reg)
+    if not clusters:
+        return {"final_judgement":agg["final_judgement"],"dimension_assessments":agg["dimension_states"],"core_diagnosis":None,"issue_candidates":[],"strengths":[]}
+
     provider = get_provider()
     prompt = (PROMPTS / "02_feedback_composer.md").read_text(encoding="utf-8")
-    user = _render(
-        prompt,
-        {
-            "FINAL_JUDGEMENT": agg["final_judgement"],
-            "DIMENSION_STATES": agg["dimension_states"],
-            "FAILED_RULES_ONLY": failed,
-            "VERIFICATION_RESULTS": verification_results,
-            "PASSED_STRENGTH_CANDIDATES": [],
-        },
-    )
-
+    user = _render(prompt, {"FINAL_JUDGEMENT":agg["final_judgement"],"DIMENSION_STATES":agg["dimension_states"],"FAILED_RULES_ONLY":failed,"FAILED_RULE_CLUSTERS":clusters,"VERIFICATION_RESULTS":verification_results,"PASSED_STRENGTH_CANDIDATES":[]})
     try:
-        raw = await provider.generate_json(
-            "你是 FEEDBACK_COMPOSER。不得新增审稿标准；最终判断由程序给定，不得修改。",
-            user,
-        )
+        raw = await provider.generate_json("你是 FEEDBACK_COMPOSER。不得新增审稿标准；不得修改程序最终判断。作者端优先按 FAILED_RULE_CLUSTERS 合并同源问题；不得一 Rule 一问题；不得把 Gate 后果、severity 或 BLOCKER 本身写成独立问题。", user)
         feedback = normalize_feedback(raw)
-        # Runtime is authoritative.
         feedback["final_judgement"] = agg["final_judgement"]
         feedback["dimension_assessments"] = agg["dimension_states"]
         validate_feedback(feedback, eval_result, agg["final_judgement"])
         return feedback
     except Exception as exc:
-        logger.warning("Feedback Composer contract failed; using deterministic fallback: %s", exc)
-        return deterministic_feedback_fallback(eval_result, agg)
-
+        logger.warning("Feedback Composer failed; clustered fallback: %s", exc)
+        issues=[]
+        for c in clusters:
+            ids=c["supporting_rule_ids"]; ev=c["article_evidence"]
+            if len(ids)==1:
+                rid=ids[0]; f=next(x for x in failed if x["rule_id"]==rid); text=f"{reg[rid]['name']}：{f['match_explanation']}"
+            else:
+                text=f"{c['cluster_hint']}：多个已 FAIL Rules 指向同一上游问题。"
+            issues.append({"text":text,"supporting_rule_ids":ids,"article_evidence":ev})
+        return {"final_judgement":agg["final_judgement"],"dimension_assessments":agg["dimension_states"],"core_diagnosis":issues[0] if issues else None,"issue_candidates":issues,"strengths":[]}
 
 def registry_hash():
     return load_json(REGISTRY).get("registry_semantic_hash", "unknown")
@@ -432,21 +434,21 @@ async def review_article(
     if content_type == "AUTO":
         content_type = await route_content_type(article)
 
-    verification_note = None
     verification_results: list[dict[str, Any]] = []
-    if verify_facts:
-        verification_note = (
-            "Web v0.1.2 尚未接入外部事实检索插件；本次不会伪造事实核验结果。"
-        )
+    verification_context = make_verification_context(verify_facts, verification_results)
+    verification_note = (
+        "Web v0.1.3 尚未接入外部事实检索插件；verification_state=PARTIAL，未覆盖事实不会自动判错。"
+        if verify_facts else
+        "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
+    )
 
-    eval_result = await evaluate_rules(article, content_type, verification_results)
+    eval_result = await evaluate_rules(article, content_type, verification_context)
     validate_eval(eval_result, content_type)
-
-    eval_result = await adjudicate_unresolved(article, content_type, eval_result)
+    eval_result = await adjudicate_unresolved(article, content_type, eval_result, verification_context)
     validate_eval(eval_result, content_type)
 
     agg = aggregate(eval_result)
-    feedback = await compose_feedback(eval_result, agg, verification_results)
+    feedback = await compose_feedback(eval_result, agg, verification_context.results)
 
     core = feedback.get("core_diagnosis")
     core_text = core.get("text") if isinstance(core, dict) else None
