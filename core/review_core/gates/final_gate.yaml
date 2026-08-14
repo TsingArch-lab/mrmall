@@ -1,0 +1,16 @@
+version: "0.2"
+gate: FINAL
+always_apply: [G001,G002,G003,F001,F002,F003]
+expression_rules: [X001,X002,X003,X004,X005,X006]
+aggregation:
+  blocker_fail: "REVISE"
+  major_threshold: 3
+  major_threshold_action: "REVISE"
+  minor_policy: "不阻塞"
+  stop_if:
+    - "全文核心建立在不可验证推测上"
+    - "补证据已无现实可能"
+decision_output:
+  PASS: READY
+  REVISE: NOT_READY
+  STOP: ABANDON

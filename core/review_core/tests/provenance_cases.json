@@ -1,0 +1,74 @@
+{
+  "version": "0.4.0",
+  "cases": [
+    {
+      "name": "reject invented title-summary criterion",
+      "evaluation": {
+        "content_type": "A",
+        "evaluated_rule_ids": [
+          "S001"
+        ],
+        "passed_rule_ids": [
+          "S001"
+        ],
+        "failed_rules": [],
+        "na_rule_ids": [],
+        "unresolved_rules": []
+      },
+      "feedback": {
+        "final_judgement": "可以继续",
+        "dimension_assessments": {},
+        "core_diagnosis": {
+          "text": "标题没有概括全文",
+          "supporting_rule_ids": [
+            "S001"
+          ],
+          "article_evidence": [
+            "标题与第一章内容不同"
+          ]
+        },
+        "issue_candidates": [],
+        "strengths": []
+      },
+      "expect_valid": false,
+      "reason": "S001 is PASS; negative feedback cannot cite a non-failed rule."
+    },
+    {
+      "name": "accept feedback tied to actual failed rule",
+      "evaluation": {
+        "content_type": "A",
+        "evaluated_rule_ids": [
+          "I005"
+        ],
+        "passed_rule_ids": [],
+        "failed_rules": [
+          {
+            "rule_id": "I005",
+            "article_evidence": [
+              "规划动作被写成已实现结果"
+            ],
+            "match_explanation": "确定性超过证据"
+          }
+        ],
+        "na_rule_ids": [],
+        "unresolved_rules": []
+      },
+      "feedback": {
+        "final_judgement": "需要修改",
+        "dimension_assessments": {},
+        "core_diagnosis": {
+          "text": "部分判断的确定性超过现有证据",
+          "supporting_rule_ids": [
+            "I005"
+          ],
+          "article_evidence": [
+            "规划动作被写成已实现结果"
+          ]
+        },
+        "issue_candidates": [],
+        "strengths": []
+      },
+      "expect_valid": true
+    }
+  ]
+}

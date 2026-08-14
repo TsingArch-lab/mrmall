@@ -1,0 +1,19 @@
+version: "0.2"
+gate: TOPIC
+rules_by_type:
+  A: [T001,T002,T003,T004,T005]
+  B: [T001,T002,T003,T004,T005]
+  C: [T003,T101]
+  D: [T004,T102]
+  E: [T103]
+aggregation:
+  blocker_fail: "REVISE"
+  stop_conditions:
+    - "账号范围根本不成立"
+    - "核心证据没有现实获取路径"
+    - "继续只能依赖猜测或PR扩写"
+  special:
+    A_B: "T001-T005中两个以上FAIL时，不进入Evidence Gate"
+on_pass: EVIDENCE
+on_revise: TOPIC
+on_stop: END

@@ -1,0 +1,20 @@
+version: 0.1.1-web
+brand: Mall先生
+single_source_of_truth: rules/*.md
+executable_rule_files:
+- content_values.md
+- topic_rules.md
+- insight_rules.md
+- structure_rules.md
+- opening_rules.md
+- expression_rules.md
+- review_rules.md
+reference_case_files:
+- good_examples.md
+- bad_examples.md
+policy:
+  human_edits_markdown_only: true
+  registry_is_generated: true
+  runtime_may_modify_rules: false
+  gate_may_create_rules: false
+  agent_may_create_rules: false

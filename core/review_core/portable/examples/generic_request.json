@@ -1,0 +1,14 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "<contents of 01_rule_batch_evaluator.md>"
+    },
+    {
+      "role": "user",
+      "content": "<article + applicable rules>"
+    }
+  ],
+  "response_schema": "portable/schemas/rule_evaluation_schema.json",
+  "temperature": "as_low_as_platform_allows"
+}

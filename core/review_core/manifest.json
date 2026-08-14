@@ -1,0 +1,53 @@
+{
+  "version": "0.5.0-portable",
+  "brand": "Mall先生",
+  "layers": [
+    "rules",
+    "registry",
+    "gates",
+    "agents"
+  ],
+  "rule_registry_files": [
+    "global_rules.yaml",
+    "topic_rules.yaml",
+    "evidence_rules.yaml",
+    "insight_rules.yaml",
+    "structure_rules.yaml",
+    "expression_rules.yaml",
+    "final_rules.yaml",
+    "example_map.yaml"
+  ],
+  "gate_files": [
+    "router.yaml",
+    "topic_gate.yaml",
+    "evidence_gate.yaml",
+    "insight_gate.yaml",
+    "structure_gate.yaml",
+    "final_gate.yaml"
+  ],
+  "agents": [
+    "router.md",
+    "chief_editor.md",
+    "rule_engine_contract.md",
+    "author_feedback_spec.md",
+    "verification_search_spec.md"
+  ],
+  "docs": [
+    "RULE_GOVERNANCE.md"
+  ],
+  "runtime": {
+    "mode": "RULE_FIRST_REVIEW_RUNTIME",
+    "compiled_registry": "registry/compiled_rule_registry.json",
+    "runtime_spec": "engine/review_runtime.yaml",
+    "rule_eval_schema": "engine/rule_evaluation_schema.json",
+    "feedback_schema": "engine/feedback_candidate_schema.json",
+    "provenance_validator": "engine/provenance_validator.py"
+  },
+  "semantic_change": "NONE: execution architecture only; no new content-quality rules",
+  "single_source_of_truth": "rules/*.md",
+  "rule_compiler": "engine/compile_rules.py",
+  "rule_source_validator": "engine/validate_rule_source.py",
+  "portable_core": "portable/",
+  "provider_dependency": "none",
+  "minimum_llm_contract": "generate(messages, response_schema?) -> text/json"
+}

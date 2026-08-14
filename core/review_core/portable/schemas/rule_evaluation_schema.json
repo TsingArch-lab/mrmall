@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuleEvaluationResult",
+  "type": "object",
+  "required": [
+    "content_type",
+    "evaluated_rule_ids",
+    "passed_rule_ids",
+    "failed_rules",
+    "na_rule_ids",
+    "unresolved_rules"
+  ],
+  "properties": {
+    "content_type": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ]
+    },
+    "evaluated_rule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "passed_rule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "failed_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "article_evidence",
+          "match_explanation"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "article_evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "match_explanation": {
+            "type": "string",
+            "description": "Only explain how evidence matches the existing fail_condition; no new criterion."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "na_rule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "unresolved_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "why_unresolved"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "why_unresolved": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

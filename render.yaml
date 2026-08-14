@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mall-content-os-review-api
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt && python core/review_core/engine/compile_rules.py && python core/review_core/engine/validate_rule_source.py
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: LLM_PROVIDER
+        value: mock
+      - key: CORS_ORIGINS
+        value: '*'

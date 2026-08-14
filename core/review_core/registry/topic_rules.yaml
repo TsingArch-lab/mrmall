@@ -1,0 +1,103 @@
+version: "0.2"
+rules:
+  - rule_id: T001
+    source_file: topic_rules.md
+    source_section: 一、问题1 深层问题
+    name: 深层问题
+    stage: TOPIC
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "连续追问三次‘这说明了什么’后，是否已经超越事实复述和行业常识？"
+    pass_condition: "第三层问题形成可验证、值得分析的经营或行业问题。"
+    fail_condition: "仍停留在‘企业做得不错/符合趋势/消费者喜欢’。"
+    exceptions: []
+
+  - rule_id: T002
+    source_file: topic_rules.md
+    source_section: 一、问题2 判断链条可迁移
+    name: 判断层可迁移
+    stage: TOPIC
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "抽掉具体主体名称后，核心判断是否仍然是关于行业或经营机制的判断？"
+    pass_condition: "判断可脱离单一企业成立，同时证据保持主体专属性。"
+    fail_condition: "判断只是对该企业的描述，换主体即失效。"
+    exceptions: []
+
+  - rule_id: T003
+    source_file: topic_rules.md
+    source_section: 一、问题3 经营决策落点
+    name: 经营决策落点
+    stage: TOPIC
+    applies_to: [A,B,C]
+    severity: BLOCKER
+    evaluation_question: "能否自然补全‘因此，一个招商/运营/项目总，可以据此判断或调整___’？"
+    pass_condition: "能形成具体动作、判断标准或决策含义。"
+    fail_condition: "只能说‘值得关注/很有意思/体现趋势’。"
+    exceptions:
+      - "类型D不强制。"
+      - "类型E不强制。"
+
+  - rule_id: T004
+    source_file: topic_rules.md
+    source_section: 一、问题4 值得追问的矛盾
+    name: 真实张力
+    stage: TOPIC
+    applies_to: [A,B,D]
+    severity: MAJOR
+    evaluation_question: "是否存在反常识、反预期、行业共识冲突、代价或此前赌注中的至少一项？"
+    pass_condition: "至少存在一项真实张力，并能被证据支持。"
+    fail_condition: "只能通过修辞制造冲突。"
+    exceptions:
+      - "类型E不要求。"
+      - "类型C可由数据异常或口径差异替代。"
+
+  - rule_id: T005
+    source_file: topic_rules.md
+    source_section: 一、问题5 一手证据
+    name: 核心证据可得
+    stage: TOPIC
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "是否有现实路径获得具体数字、原话或操作细节？"
+    pass_condition: "存在可获得的核心证据，不主要依赖企业PR自述。"
+    fail_condition: "只能依赖软文/预告/二手概括来支撑核心判断。"
+    exceptions:
+      - "类型C以权威原始公开文件为核心证据。"
+      - "类型E以权威、及时、完整的信息源为核心证据。"
+
+  - rule_id: T101
+    source_file: topic_rules.md
+    source_section: 二、类型C
+    name: 数据解读价值
+    stage: TOPIC
+    applies_to: [C]
+    severity: BLOCKER
+    evaluation_question: "是否有明确的原始数据/报告，且存在准确转译和决策解释价值？"
+    pass_condition: "原始文件明确，指标可追溯，且读者能据此理解实际含义。"
+    fail_condition: "只是摘抄数据，或原始来源不明。"
+    exceptions: []
+
+  - rule_id: T102
+    source_file: topic_rules.md
+    source_section: 二、类型D
+    name: 立场具体
+    stage: TOPIC
+    applies_to: [D]
+    severity: BLOCKER
+    evaluation_question: "作者立场是否具体到可以被同行验证或反驳？"
+    pass_condition: "立场建立在具体事件、经历或行业事实之上。"
+    fail_condition: "抽象道德倡议或泛泛表态。"
+    exceptions: []
+
+  - rule_id: T103
+    source_file: topic_rules.md
+    source_section: 二、类型E
+    name: 信息汇总价值
+    stage: TOPIC
+    applies_to: [E]
+    severity: BLOCKER
+    evaluation_question: "整理是否在时效、完整性或查找效率上提供明显价值？"
+    pass_condition: "范围、时间、分类明确，整理能降低读者查找成本。"
+    fail_condition: "只是重复公开信息，没有结构或覆盖优势。"
+    exceptions: []

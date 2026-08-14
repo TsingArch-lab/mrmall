@@ -1,0 +1,15 @@
+version: "0.2"
+gate: EVIDENCE
+always_apply: [G001,G002]
+rules_by_type:
+  A: [E001,E002,E003]
+  B: [E002,E003,E101]
+  C: [E201,E202]
+  D: [E301]
+  E: [E401]
+aggregation:
+  any_blocker_fail: "REVISE"
+  stop_if: "关键证据无法补足且继续生产会制造虚假确定性"
+on_pass: INSIGHT
+on_revise: EVIDENCE
+on_stop: END

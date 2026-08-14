@@ -1,0 +1,64 @@
+{
+  "name": "MODEL_AGNOSTIC_RULE_FIRST_REVIEW",
+  "version": "0.5.0-portable",
+  "source_of_truth": "rules/*.md",
+  "required_model_capability": {
+    "minimum": [
+      "accept text prompt",
+      "return text"
+    ],
+    "preferred": [
+      "structured JSON output"
+    ],
+    "optional": [
+      "web/search/tool use for fact verification"
+    ]
+  },
+  "core_calls": [
+    {
+      "id": "RULE_BATCH_EVALUATOR",
+      "input": [
+        "article",
+        "content_type",
+        "applicable_rules_compact",
+        "verification_results_optional"
+      ],
+      "output_schema": "schemas/rule_evaluation_schema.json"
+    },
+    {
+      "id": "FEEDBACK_COMPOSER",
+      "input": [
+        "failed_rules_only",
+        "deterministic_decision",
+        "dimension_states",
+        "verification_results_optional"
+      ],
+      "output_schema": "schemas/feedback_candidate_schema.json"
+    }
+  ],
+  "conditional_calls": [
+    {
+      "id": "ADJUDICATOR",
+      "trigger": "UNRESOLVED only",
+      "scope": "targeted rule IDs only"
+    }
+  ],
+  "deterministic_components": [
+    "rule compilation",
+    "applicability filtering",
+    "gate aggregation",
+    "dimension mapping",
+    "feedback provenance validation"
+  ],
+  "model_forbidden": [
+    "invent rules",
+    "change gate decision",
+    "penalize without FAIL rule",
+    "search for evidence to support author opinions",
+    "convert uncertainty to FAIL by default"
+  ],
+  "verification_behavior": {
+    "if_search_available": "run verification spec",
+    "if_search_unavailable": "do not invent; mark verification unavailable and use supplied evidence only"
+  }
+}

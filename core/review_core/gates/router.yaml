@@ -1,0 +1,16 @@
+version: "0.2"
+gate: ROUTER
+purpose: "确定A/B/C/D/E内容类型，只负责路由。"
+decision_states: [PASS, REVISE]
+rules:
+  required: [G004]
+routing_output:
+  - content_type
+  - confidence
+  - primary_value
+  - enabled_rule_groups
+  - exempted_rule_groups
+pass_condition: "content_type已确定，confidence>=0.70"
+on_fail:
+  action: "REVISE"
+  return_to: "ROUTER"

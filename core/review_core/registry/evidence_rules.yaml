@@ -1,0 +1,101 @@
+version: "0.2"
+rules:
+  - rule_id: E001
+    source_file: topic_rules.md
+    source_section: 四、调研止损标准
+    name: A类核心证据充分性
+    stage: EVIDENCE
+    applies_to: [A]
+    severity: BLOCKER
+    evaluation_question: "是否存在足够具体、可追溯的直接证据支撑核心判断？"
+    pass_condition: "至少具备具体数字、操作细节、官方原始文件、现场观察、直接采访等证据中的两类，并且足以支撑核心判断。"
+    fail_condition: "核心判断主要依赖抽象描述、PR话术或不可追溯的二手概括。"
+    exceptions:
+      - "不强制要求必须存在采访原话。"
+      - "若某类证据缺失，但其他直接证据已经足够支撑核心判断，不构成FAIL。"
+
+  - rule_id: E002
+    source_file: topic_rules.md
+    source_section: 一、问题5 一手证据
+    name: PR不可自证
+    stage: EVIDENCE
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "核心判断是否主要由企业自己对自己的成功描述来证明？"
+    pass_condition: "企业材料只作背景，核心判断由独立事实、直接采访、现场观察或可核查数据支撑。"
+    fail_condition: "循环使用企业自述证明企业成功。"
+    exceptions: []
+
+  - rule_id: E003
+    source_file: topic_rules.md
+    source_section: 四、调研止损标准第3条
+    name: 反向验证意识
+    stage: EVIDENCE
+    applies_to: [A,B]
+    severity: MAJOR
+    evaluation_question: "当前证据是否存在需要额外反向验证的明显风险？"
+    pass_condition: "没有明显风险时可N/A；存在强因果、强外推、证据冲突或替代解释时，已进行必要检查。"
+    fail_condition: "明显需要验证却完全未检查，导致结论强度超过证据。"
+    exceptions:
+      - "不要求每篇文章必须找到反例。"
+      - "不要求把反向验证结果强制写进正文。"
+
+  - rule_id: E101
+    source_file: topic_rules.md
+    source_section: 二、类型B
+    name: 多案例独立性
+    stage: EVIDENCE
+    applies_to: [B]
+    severity: BLOCKER
+    evaluation_question: "是否至少有两个独立主体/案例用于比较，而非同一宣传口径的重复？"
+    pass_condition: "至少两个独立主体，且存在可比较维度。"
+    fail_condition: "单案例冒充行业趋势，或案例来源高度同质。"
+    exceptions: []
+
+  - rule_id: E201
+    source_file: topic_rules.md
+    source_section: 二、类型C
+    name: 原始公开文件优先
+    stage: EVIDENCE
+    applies_to: [C]
+    severity: BLOCKER
+    evaluation_question: "核心数据是否来自财报、招募说明书、研究报告等权威原始材料？"
+    pass_condition: "原始来源可追溯到文件、章节、页码或指标。"
+    fail_condition: "主要依赖二手报道转述。"
+    exceptions: []
+
+  - rule_id: E202
+    source_file: content_values.md
+    source_section: 四、真实优先
+    name: 数据口径不混用
+    stage: EVIDENCE
+    applies_to: [C]
+    severity: BLOCKER
+    evaluation_question: "同比/环比、区域、含税、会计口径等是否保持一致？"
+    pass_condition: "所有关键比较口径一致或差异已明确说明。"
+    fail_condition: "不同口径直接比较并得出结论。"
+    exceptions: []
+
+  - rule_id: E301
+    source_file: topic_rules.md
+    source_section: 二、类型D
+    name: 事实与体验区分
+    stage: EVIDENCE
+    applies_to: [D]
+    severity: BLOCKER
+    evaluation_question: "客观事实与作者个人体验/判断是否明确区分？"
+    pass_condition: "事实可核查；个人体验明确标注为个人经验。"
+    fail_condition: "将个人感受写成普遍事实。"
+    exceptions: []
+
+  - rule_id: E401
+    source_file: topic_rules.md
+    source_section: 二、类型E
+    name: 信息时效与覆盖
+    stage: EVIDENCE
+    applies_to: [E]
+    severity: BLOCKER
+    evaluation_question: "汇总是否明确截止时间，并覆盖范围内最重要的信息类别？"
+    pass_condition: "截止时间、来源、分类范围均明确。"
+    fail_condition: "大量过期/遗漏，或来源不可核查。"
+    exceptions: []

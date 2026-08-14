@@ -1,0 +1,132 @@
+version: "0.2"
+rules:
+  - rule_id: I001
+    source_file: insight_rules.md
+    source_section: 一、普通观点 vs 高级观点
+    name: 核心判断包含具体机制
+    stage: INSIGHT
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "如果同行追问‘为什么’，能否回答出具体X如何导致Y？"
+    pass_condition: "判断包含明确机制链条，不只是结果或形容词。"
+    fail_condition: "专业、成功、年轻化、长期主义等抽象标签替代机制。"
+    exceptions: []
+
+  - rule_id: I002
+    source_file: insight_rules.md
+    source_section: 一、高级观点三个特征
+    name: 高级观点至少满足2项
+    stage: INSIGHT
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "观点是否具备可证伪、可执行、有归因链条中的至少两项？"
+    pass_condition: "至少2项成立。这里的‘可证伪’指现实中存在明确检验边界，不要求文章主动提供反方案例。"
+    fail_condition: "只有描述性归纳或态度判断。"
+    exceptions:
+      - "不得把‘可证伪’解释为‘必须在正文中自我反驳’。"
+
+  - rule_id: I003
+    source_file: insight_rules.md
+    source_section: 二、五个追问
+    name: 五个追问均已过一遍
+    stage: INSIGHT
+    applies_to: [A,B]
+    severity: MAJOR
+    evaluation_question: "比较、话语拆解、多案例、历史、数据五个追问是否都被检查过？"
+    pass_condition: "五问均有回答或明确记录无有效结果。"
+    fail_condition: "只沿着作者最初思路单线推进。"
+    exceptions: []
+
+  - rule_id: I004
+    source_file: insight_rules.md
+    source_section: 三、失败模式1
+    name: 判断不能只是事实改写
+    stage: INSIGHT
+    applies_to: [A,B,C,D]
+    severity: BLOCKER
+    evaluation_question: "核心判断是否只是把前文事实换一组抽象词重新说一遍？"
+    pass_condition: "判断对事实进行了机制解释、关系解释或决策解释。"
+    fail_condition: "事实→同义概括，没有信息增量。"
+    exceptions:
+      - "类型E不适用。"
+
+
+  - rule_id: I005
+    source_file: content_values.md
+    source_section: 四、真实永远优先于精彩
+    name: 判断确定性不得超过证据强度
+    stage: INSIGHT
+    applies_to: [A,B,C,D]
+    severity: BLOCKER
+    evaluation_question: "当前措辞的确定性，是否高于现有证据能够支持的程度？"
+    pass_condition: "事实、推断、作者判断被清楚区分；相关性不被写成未经证明的因果；局部案例不被无依据外推为普遍规律。"
+    fail_condition: "证据只支持‘可能/呈现出/倾向于’，文章却写成‘就是/决定了/证明了/必然导致’。"
+    exceptions:
+      - "若有直接证据、充分时间链或高度一致的多源事实支撑，可使用更强判断。"
+
+  - rule_id: I006
+    source_file: content_values.md
+    source_section: 四、真实优先于精彩
+    name: 反例与替代解释条件触发
+    stage: INSIGHT
+    applies_to: [A,B,C,D]
+    severity: MAJOR
+    evaluation_question: "当前判断是否触发了需要额外检查反例/风险/替代解释的条件？"
+    trigger_if:
+      - "使用强因果归因"
+      - "将局部案例外推为普遍规律"
+      - "证据之间存在冲突"
+      - "存在一个同样合理且会明显改变结论的替代解释"
+      - "使用‘必然、证明、核心原因、真正决定’等高确定性表达"
+    pass_condition: "未触发则N/A；触发后，作者已检查相关反例/局限/替代解释，并据此校准判断强度。"
+    fail_condition: "触发条件明显存在，却完全未检查，且当前结论因此显得过度确定。"
+    exceptions:
+      - "不要求为了形式完整而加入固定反面段落。"
+
+  - rule_id: I101
+    source_file: topic_rules.md
+    source_section: 二、类型C
+    name: 数据解释超越摘抄
+    stage: INSIGHT
+    applies_to: [C]
+    severity: BLOCKER
+    evaluation_question: "是否解释了数据意味着什么、为什么重要、对决策有什么影响？"
+    pass_condition: "至少完成准确转译+一项可执行含义。"
+    fail_condition: "只复述数字。"
+    exceptions: []
+
+  - rule_id: I102
+    source_file: content_values.md
+    source_section: 七、类型差异
+    name: C类不强制宏大判断
+    stage: INSIGHT
+    applies_to: [C]
+    severity: NA
+    evaluation_question: "是否错误地要求数据解读稿产生A/B式宏大行业判断？"
+    pass_condition: "不强制。"
+    fail_condition: "无。"
+    exceptions: []
+
+  - rule_id: I201
+    source_file: topic_rules.md
+    source_section: 二、类型D
+    name: 立场可验证或反驳
+    stage: INSIGHT
+    applies_to: [D]
+    severity: BLOCKER
+    evaluation_question: "立场是否具体到同行可以不同意，并能指出事实依据？"
+    pass_condition: "立场具体、有事实根。"
+    fail_condition: "泛化成价值口号。"
+    exceptions: []
+
+  - rule_id: I301
+    source_file: topic_rules.md
+    source_section: 二、类型E
+    name: E类不强制观点
+    stage: INSIGHT
+    applies_to: [E]
+    severity: NA
+    evaluation_question: "是否错误要求信息汇总稿形成宏大判断？"
+    pass_condition: "不强制，只允许基于信息本身给出朴素建议。"
+    fail_condition: "无。"
+    exceptions: []

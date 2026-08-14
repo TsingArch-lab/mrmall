@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FeedbackCandidateBundle",
+  "type": "object",
+  "required": [
+    "final_judgement",
+    "dimension_assessments",
+    "core_diagnosis",
+    "issue_candidates",
+    "strengths"
+  ],
+  "properties": {
+    "final_judgement": {
+      "enum": [
+        "可以继续",
+        "需要修改",
+        "建议停止"
+      ]
+    },
+    "dimension_assessments": {
+      "type": "object"
+    },
+    "core_diagnosis": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "supporting_rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "article_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "text",
+        "supporting_rule_ids",
+        "article_evidence"
+      ],
+      "additionalProperties": false
+    },
+    "issue_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "text",
+          "supporting_rule_ids",
+          "article_evidence"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "supporting_rule_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "article_evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

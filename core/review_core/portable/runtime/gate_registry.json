@@ -1,0 +1,186 @@
+{
+  "version": "1.0",
+  "gates": {
+    "ROUTER": {
+      "rule_ids": [
+        "G004"
+      ],
+      "thresholds": {},
+      "decision": [
+        "PASS",
+        "REVISE"
+      ]
+    },
+    "TOPIC": {
+      "by_type": {
+        "A": [
+          "T001",
+          "T002",
+          "T003",
+          "T004",
+          "T005"
+        ],
+        "B": [
+          "T001",
+          "T002",
+          "T003",
+          "T004",
+          "T005"
+        ],
+        "C": [
+          "T003",
+          "T101"
+        ],
+        "D": [
+          "T004",
+          "T102"
+        ],
+        "E": [
+          "T103"
+        ]
+      },
+      "thresholds": {
+        "blocker_fail": "REVISE",
+        "A_B_fail_count_gte_2": "REVISE"
+      }
+    },
+    "EVIDENCE": {
+      "always": [
+        "G001",
+        "G002"
+      ],
+      "by_type": {
+        "A": [
+          "E001",
+          "E002",
+          "E003"
+        ],
+        "B": [
+          "E002",
+          "E003",
+          "E101"
+        ],
+        "C": [
+          "E201",
+          "E202"
+        ],
+        "D": [
+          "E301"
+        ],
+        "E": [
+          "E401"
+        ]
+      },
+      "thresholds": {
+        "blocker_fail": "REVISE"
+      }
+    },
+    "INSIGHT": {
+      "always": [
+        "G002"
+      ],
+      "by_type": {
+        "A": [
+          "I001",
+          "I002",
+          "I003",
+          "I004",
+          "I005",
+          "I006"
+        ],
+        "B": [
+          "I001",
+          "I002",
+          "I003",
+          "I004",
+          "I005",
+          "I006"
+        ],
+        "C": [
+          "I004",
+          "I005",
+          "I006",
+          "I101",
+          "I102"
+        ],
+        "D": [
+          "I004",
+          "I005",
+          "I006",
+          "I201"
+        ],
+        "E": [
+          "I301"
+        ]
+      },
+      "thresholds": {
+        "blocker_fail": "REVISE"
+      }
+    },
+    "STRUCTURE": {
+      "by_type": {
+        "A": [
+          "S001",
+          "S002",
+          "S003",
+          "S004",
+          "S005",
+          "S006"
+        ],
+        "B": [
+          "S001",
+          "S002",
+          "S003",
+          "S004",
+          "S005",
+          "S006"
+        ],
+        "C": [
+          "S002",
+          "S003",
+          "S005",
+          "S006",
+          "S101"
+        ],
+        "D": [
+          "S002",
+          "S003",
+          "S005",
+          "S006",
+          "S201"
+        ],
+        "E": [
+          "S005",
+          "S301"
+        ]
+      },
+      "thresholds": {
+        "blocker_fail": "REVISE",
+        "major_fail_count_gte": 3
+      }
+    },
+    "FINAL": {
+      "always": [
+        "G001",
+        "G002",
+        "G003",
+        "F001",
+        "F002",
+        "F003"
+      ],
+      "all_expression": [
+        "X001",
+        "X002",
+        "X003",
+        "X004",
+        "X005",
+        "X006"
+      ],
+      "thresholds": {
+        "blocker_fail": "REVISE",
+        "major_fail_count_gte": 3,
+        "minor_blocks": false
+      }
+    }
+  }
+}

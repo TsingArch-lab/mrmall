@@ -1,0 +1,1195 @@
+{
+  "schema_version": "1.1",
+  "content_semantics_version": "0.4.1-md-source",
+  "runtime_version": "0.4.1",
+  "single_source_of_truth": "rules/*.md",
+  "generated_at_utc": "2026-08-14T02:36:29.542650+00:00",
+  "rule_count": 48,
+  "rules": [
+    {
+      "rule_id": "G001",
+      "source_file": "content_values.md",
+      "source_section": "四、真实永远优先于精彩",
+      "name": "真实性优先",
+      "stage": "GLOBAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "关键事实与结论是否来自可核查材料，而非模型补齐、猜测或未经标注的推断？",
+      "pass_condition": "所有关键事实均可追溯；推断明确标注；证据不足时降低确定性或留白。",
+      "fail_condition": "存在无法追溯却以事实口吻呈现的关键内容。",
+      "exceptions": [],
+      "semantic_hash": "sha256:d136344e9cdc2c81035aee822f12dc366bd9cb5f1fb2695b3d309502aec49ad5",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "存在无法追溯却以事实口吻呈现的关键内容。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "G002",
+      "source_file": "content_values.md",
+      "source_section": "五、好的判断从具体事实里长出来",
+      "name": "事实先于判断",
+      "stage": "GLOBAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "核心判断能否追溯到具体事实、数据、引语或操作细节？",
+      "pass_condition": "核心判断至少有一条清晰证据链。",
+      "fail_condition": "先有观点，再用零散案例装饰；或判断无法指出来源。",
+      "exceptions": [
+        "类型D允许个人立场，但必须明确区分事实与个人判断。"
+      ],
+      "semantic_hash": "sha256:c9943eeb5a37651ba7f65765725f4bfa6f9bdf26abce101b010db9b7c02c6b8b",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "先有观点，再用零散案例装饰；或判断无法指出来源。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "G003",
+      "source_file": "content_values.md",
+      "source_section": "三、批的是逻辑，不是人",
+      "name": "批逻辑不批人",
+      "stage": "GLOBAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "批评是否指向机制、决策与依据，而非人格化否定？",
+      "pass_condition": "批评对象是具体决策逻辑、机制或证据。",
+      "fail_condition": "通过羞辱、道德化或人格标签代替分析。",
+      "exceptions": [],
+      "semantic_hash": "sha256:286bed070428cc9be7cd312c2be7b97e68adc50d40df5ccf209e7bdf56427b8e",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "通过羞辱、道德化或人格标签代替分析。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "G004",
+      "source_file": "content_values.md",
+      "source_section": "七、不同类型内容有不同价值来源",
+      "name": "类型先行",
+      "stage": "ROUTER",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否先明确内容类型，再使用对应标准？",
+      "pass_condition": "内容已路由为A/B/C/D/E，且加载匹配规则。",
+      "fail_condition": "直接用深度分析标准评价所有内容。",
+      "exceptions": [],
+      "semantic_hash": "sha256:e4181645dc56440da5483a5c567fd64cd9346554939b159f0868a1bd66ff32c6",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "直接用深度分析标准评价所有内容。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T001",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题1 深层问题",
+      "name": "深层问题",
+      "stage": "TOPIC",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "连续追问三次‘这说明了什么’后，是否已经超越事实复述和行业常识？",
+      "pass_condition": "第三层问题形成可验证、值得分析的经营或行业问题。",
+      "fail_condition": "仍停留在‘企业做得不错/符合趋势/消费者喜欢’。",
+      "exceptions": [],
+      "semantic_hash": "sha256:560c28f1bb498c0424c6f3358efa81ccdca9f28a59304e6e1597917ea9addcf4",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "仍停留在‘企业做得不错/符合趋势/消费者喜欢’。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T002",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题2 判断链条可迁移",
+      "name": "判断层可迁移",
+      "stage": "TOPIC",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "抽掉具体主体名称后，核心判断是否仍然是关于行业或经营机制的判断？",
+      "pass_condition": "判断可脱离单一企业成立，同时证据保持主体专属性。",
+      "fail_condition": "判断只是对该企业的描述，换主体即失效。",
+      "exceptions": [],
+      "semantic_hash": "sha256:196fb20b865f6525d1092e73b5a91324efb819442445f92a1d9ce3096700c675",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "判断只是对该企业的描述，换主体即失效。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T003",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题3 经营决策落点",
+      "name": "经营决策落点",
+      "stage": "TOPIC",
+      "applies_to": [
+        "A",
+        "B",
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "能否自然补全‘因此，一个招商/运营/项目总，可以据此判断或调整___’？",
+      "pass_condition": "能形成具体动作、判断标准或决策含义。",
+      "fail_condition": "只能说‘值得关注/很有意思/体现趋势’。",
+      "exceptions": [
+        "类型D不强制。",
+        "类型E不强制。"
+      ],
+      "semantic_hash": "sha256:90a44dcfacf41ace6b5863de58312d0486e7845850baf8c84c51240795c8003c",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只能说‘值得关注/很有意思/体现趋势’。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T004",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题4 值得追问的矛盾",
+      "name": "真实张力",
+      "stage": "TOPIC",
+      "applies_to": [
+        "A",
+        "B",
+        "D"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "是否存在反常识、反预期、行业共识冲突、代价或此前赌注中的至少一项？",
+      "pass_condition": "至少存在一项真实张力，并能被证据支持。",
+      "fail_condition": "只能通过修辞制造冲突。",
+      "exceptions": [
+        "类型E不要求。",
+        "类型C可由数据异常或口径差异替代。"
+      ],
+      "semantic_hash": "sha256:f4fbc199278a9023acd0e85c6c1086741cb6e56a63cab06d35099011be574662",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只能通过修辞制造冲突。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T005",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题5 一手证据",
+      "name": "核心证据可得",
+      "stage": "TOPIC",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否有现实路径获得具体数字、原话或操作细节？",
+      "pass_condition": "存在可获得的核心证据，不主要依赖企业PR自述。",
+      "fail_condition": "只能依赖软文/预告/二手概括来支撑核心判断。",
+      "exceptions": [
+        "类型C以权威原始公开文件为核心证据。",
+        "类型E以权威、及时、完整的信息源为核心证据。"
+      ],
+      "semantic_hash": "sha256:ec33b908c8f65f4234cbe3cd70105e3a6b72010453136a50b618e3e70e9ffb40",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只能依赖软文/预告/二手概括来支撑核心判断。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T101",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型C",
+      "name": "数据解读价值",
+      "stage": "TOPIC",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否有明确的原始数据/报告，且存在准确转译和决策解释价值？",
+      "pass_condition": "原始文件明确，指标可追溯，且读者能据此理解实际含义。",
+      "fail_condition": "只是摘抄数据，或原始来源不明。",
+      "exceptions": [],
+      "semantic_hash": "sha256:ec57c3a788a3b8e949d9b4ad26d14e4592eba947b60787b05ae14dd881e5900d",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只是摘抄数据，或原始来源不明。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T102",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型D",
+      "name": "立场具体",
+      "stage": "TOPIC",
+      "applies_to": [
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "作者立场是否具体到可以被同行验证或反驳？",
+      "pass_condition": "立场建立在具体事件、经历或行业事实之上。",
+      "fail_condition": "抽象道德倡议或泛泛表态。",
+      "exceptions": [],
+      "semantic_hash": "sha256:19392aa8df81d2fd618a65baa64eede3470e3872e2eb9b29a9a77fe9728fa7ea",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "抽象道德倡议或泛泛表态。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "T103",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型E",
+      "name": "信息汇总价值",
+      "stage": "TOPIC",
+      "applies_to": [
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "整理是否在时效、完整性或查找效率上提供明显价值？",
+      "pass_condition": "范围、时间、分类明确，整理能降低读者查找成本。",
+      "fail_condition": "只是重复公开信息，没有结构或覆盖优势。",
+      "exceptions": [],
+      "semantic_hash": "sha256:1bf02b54dad35bbf878227682f731e6d980503b4c37f782f90934583cc943645",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只是重复公开信息，没有结构或覆盖优势。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E001",
+      "source_file": "topic_rules.md",
+      "source_section": "四、调研止损标准",
+      "name": "A类核心证据充分性",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "A"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否存在足够具体、可追溯的直接证据支撑核心判断？",
+      "pass_condition": "至少具备具体数字、操作细节、官方原始文件、现场观察、直接采访等证据中的两类，并且足以支撑核心判断。",
+      "fail_condition": "核心判断主要依赖抽象描述、PR话术或不可追溯的二手概括。",
+      "exceptions": [
+        "不强制要求必须存在采访原话。",
+        "若某类证据缺失，但其他直接证据已经足够支撑核心判断，不构成FAIL。"
+      ],
+      "semantic_hash": "sha256:ff3d2f8e2b3976884d8e71b535c29403c091d8b71748ac4b56a615cc7d56c0f0",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "核心判断主要依赖抽象描述、PR话术或不可追溯的二手概括。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E002",
+      "source_file": "topic_rules.md",
+      "source_section": "一、问题5 一手证据",
+      "name": "PR不可自证",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "核心判断是否主要由企业自己对自己的成功描述来证明？",
+      "pass_condition": "企业材料只作背景，核心判断由独立事实、直接采访、现场观察或可核查数据支撑。",
+      "fail_condition": "循环使用企业自述证明企业成功。",
+      "exceptions": [],
+      "semantic_hash": "sha256:241380347e413dc9c05c60df144cf3c8384d9b5ae9964e2e1ec935d898795600",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "循环使用企业自述证明企业成功。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E003",
+      "source_file": "topic_rules.md",
+      "source_section": "四、调研止损标准第3条",
+      "name": "反向验证意识",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "当前证据是否存在需要额外反向验证的明显风险？",
+      "pass_condition": "没有明显风险时可N/A；存在强因果、强外推、证据冲突或替代解释时，已进行必要检查。",
+      "fail_condition": "明显需要验证却完全未检查，导致结论强度超过证据。",
+      "exceptions": [
+        "不要求每篇文章必须找到反例。",
+        "不要求把反向验证结果强制写进正文。"
+      ],
+      "semantic_hash": "sha256:a0b3d6bc0f9638f328e89e5883ddf1ae7f646cfd6fd0c7cc7deb56913e917076",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "明显需要验证却完全未检查，导致结论强度超过证据。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E101",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型B",
+      "name": "多案例独立性",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否至少有两个独立主体/案例用于比较，而非同一宣传口径的重复？",
+      "pass_condition": "至少两个独立主体，且存在可比较维度。",
+      "fail_condition": "单案例冒充行业趋势，或案例来源高度同质。",
+      "exceptions": [],
+      "semantic_hash": "sha256:98328f78875b081ad4f261dc3461313131d468122c3b8c6c2a7955c11004b41f",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "单案例冒充行业趋势，或案例来源高度同质。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E201",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型C",
+      "name": "原始公开文件优先",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "核心数据是否来自财报、招募说明书、研究报告等权威原始材料？",
+      "pass_condition": "原始来源可追溯到文件、章节、页码或指标。",
+      "fail_condition": "主要依赖二手报道转述。",
+      "exceptions": [],
+      "semantic_hash": "sha256:cbbe9a9a0a86229f37b054c5d9afc8a3fb9dcf06eaeb01a4792288ffcff7e480",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "主要依赖二手报道转述。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E202",
+      "source_file": "content_values.md",
+      "source_section": "四、真实优先",
+      "name": "数据口径不混用",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "同比/环比、区域、含税、会计口径等是否保持一致？",
+      "pass_condition": "所有关键比较口径一致或差异已明确说明。",
+      "fail_condition": "不同口径直接比较并得出结论。",
+      "exceptions": [],
+      "semantic_hash": "sha256:87262ee5fa00f99448abbe93dc1cb6ad81983d6c4b3f9700d664924ddcb0f46c",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "不同口径直接比较并得出结论。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E301",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型D",
+      "name": "事实与体验区分",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "客观事实与作者个人体验/判断是否明确区分？",
+      "pass_condition": "事实可核查；个人体验明确标注为个人经验。",
+      "fail_condition": "将个人感受写成普遍事实。",
+      "exceptions": [],
+      "semantic_hash": "sha256:b731369637df8a45fcfb56223a8071642d9283e9449154bb29508727ef0d1a0f",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "将个人感受写成普遍事实。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "E401",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型E",
+      "name": "信息时效与覆盖",
+      "stage": "EVIDENCE",
+      "applies_to": [
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "汇总是否明确截止时间，并覆盖范围内最重要的信息类别？",
+      "pass_condition": "截止时间、来源、分类范围均明确。",
+      "fail_condition": "大量过期/遗漏，或来源不可核查。",
+      "exceptions": [],
+      "semantic_hash": "sha256:fd2be942745e5522bf06843241d44bb80c41b34d3db523d0e03dc94aef6863db",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "大量过期/遗漏，或来源不可核查。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I001",
+      "source_file": "insight_rules.md",
+      "source_section": "一、普通观点 vs 高级观点",
+      "name": "核心判断包含具体机制",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "如果同行追问‘为什么’，能否回答出具体X如何导致Y？",
+      "pass_condition": "判断包含明确机制链条，不只是结果或形容词。",
+      "fail_condition": "专业、成功、年轻化、长期主义等抽象标签替代机制。",
+      "exceptions": [],
+      "semantic_hash": "sha256:4905f5a242b71b6968ad5377e181d5d12b3a113670e70a198898c17ae65075cc",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "专业、成功、年轻化、长期主义等抽象标签替代机制。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I002",
+      "source_file": "insight_rules.md",
+      "source_section": "一、高级观点三个特征",
+      "name": "高级观点至少满足2项",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "观点是否具备可证伪、可执行、有归因链条中的至少两项？",
+      "pass_condition": "至少2项成立。这里的‘可证伪’指现实中存在明确检验边界，不要求文章主动提供反方案例。",
+      "fail_condition": "只有描述性归纳或态度判断。",
+      "exceptions": [
+        "不得把‘可证伪’解释为‘必须在正文中自我反驳’。"
+      ],
+      "semantic_hash": "sha256:ded3ab40e567db065180d776ae0e4aeea7f724b5b8ae094091f79c3a17cd14e4",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只有描述性归纳或态度判断。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I003",
+      "source_file": "insight_rules.md",
+      "source_section": "二、五个追问",
+      "name": "五个追问均已过一遍",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "比较、话语拆解、多案例、历史、数据五个追问是否都被检查过？",
+      "pass_condition": "五问均有回答或明确记录无有效结果。",
+      "fail_condition": "只沿着作者最初思路单线推进。",
+      "exceptions": [],
+      "semantic_hash": "sha256:fce61cda1a627f1af934fb9a31d7dee5304d1d495a7e8a4c9c16a7da4cd57902",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只沿着作者最初思路单线推进。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I004",
+      "source_file": "insight_rules.md",
+      "source_section": "三、失败模式1",
+      "name": "判断不能只是事实改写",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "核心判断是否只是把前文事实换一组抽象词重新说一遍？",
+      "pass_condition": "判断对事实进行了机制解释、关系解释或决策解释。",
+      "fail_condition": "事实→同义概括，没有信息增量。",
+      "exceptions": [
+        "类型E不适用。"
+      ],
+      "semantic_hash": "sha256:df68434a7dee48ff57bc50fe6d2035a025a8911c7dad318e0da0e01f4825b9be",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "事实→同义概括，没有信息增量。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I005",
+      "source_file": "content_values.md",
+      "source_section": "四、真实永远优先于精彩",
+      "name": "判断确定性不得超过证据强度",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "当前措辞的确定性，是否高于现有证据能够支持的程度？",
+      "pass_condition": "事实、推断、作者判断被清楚区分；相关性不被写成未经证明的因果；局部案例不被无依据外推为普遍规律。",
+      "fail_condition": "证据只支持‘可能/呈现出/倾向于’，文章却写成‘就是/决定了/证明了/必然导致’。",
+      "exceptions": [
+        "若有直接证据、充分时间链或高度一致的多源事实支撑，可使用更强判断。"
+      ],
+      "semantic_hash": "sha256:e935a0feed4e4f349caefa11e5ad49a335a0bb1a25740bd5c043954a0db13eea",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "证据只支持‘可能/呈现出/倾向于’，文章却写成‘就是/决定了/证明了/必然导致’。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I006",
+      "source_file": "content_values.md",
+      "source_section": "四、真实优先于精彩",
+      "name": "反例与替代解释条件触发",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "当前判断是否触发了需要额外检查反例/风险/替代解释的条件？",
+      "pass_condition": "未触发则N/A；触发后，作者已检查相关反例/局限/替代解释，并据此校准判断强度。",
+      "fail_condition": "触发条件明显存在，却完全未检查，且当前结论因此显得过度确定。",
+      "exceptions": [
+        "不要求为了形式完整而加入固定反面段落。"
+      ],
+      "semantic_hash": "sha256:d87cd61e44302dba24c04f000029996f576dc9b9d45f3875ee4ddf292ff4d8e5",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "触发条件明显存在，却完全未检查，且当前结论因此显得过度确定。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I101",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型C",
+      "name": "数据解释超越摘抄",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否解释了数据意味着什么、为什么重要、对决策有什么影响？",
+      "pass_condition": "至少完成准确转译+一项可执行含义。",
+      "fail_condition": "只复述数字。",
+      "exceptions": [],
+      "semantic_hash": "sha256:98f14652344bba7dd98607a61df6e92a71eca70189d62aa619d4e29ae958537d",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只复述数字。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I102",
+      "source_file": "content_values.md",
+      "source_section": "七、类型差异",
+      "name": "C类不强制宏大判断",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "NA",
+      "evaluation_question": "是否错误地要求数据解读稿产生A/B式宏大行业判断？",
+      "pass_condition": "不强制。",
+      "fail_condition": "无。",
+      "exceptions": [],
+      "semantic_hash": "sha256:d404a51d2e35f0a4667fcb63b78de6aa43018feb544600b9bc6036170e7f5cb3",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "无。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I201",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型D",
+      "name": "立场可验证或反驳",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "立场是否具体到同行可以不同意，并能指出事实依据？",
+      "pass_condition": "立场具体、有事实根。",
+      "fail_condition": "泛化成价值口号。",
+      "exceptions": [],
+      "semantic_hash": "sha256:4cf4203a2f7df05a1bd9c808b854335359570bf9b1ac7c47fa20c2a1654eeef7",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "泛化成价值口号。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "I301",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型E",
+      "name": "E类不强制观点",
+      "stage": "INSIGHT",
+      "applies_to": [
+        "E"
+      ],
+      "severity": "NA",
+      "evaluation_question": "是否错误要求信息汇总稿形成宏大判断？",
+      "pass_condition": "不强制，只允许基于信息本身给出朴素建议。",
+      "fail_condition": "无。",
+      "exceptions": [],
+      "semantic_hash": "sha256:905ac79b8106b792d1c472dfd22fac4206aa134e087f73677281c9e9fcb767f4",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "无。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S001",
+      "source_file": "structure_rules.md",
+      "source_section": "一、底层逻辑链",
+      "name": "A/B完整论证闭环",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "文章是否完成设问→证据→推导→收束判断？",
+      "pass_condition": "核心问题、证据、推导和判断形成完整闭环；反例/风险/替代解释仅按I006条件触发。",
+      "fail_condition": "缺少核心问题、证据、推导或收束判断中的任一关键环节。",
+      "exceptions": [
+        "反证不再作为每篇文章的固定结构要求。"
+      ],
+      "semantic_hash": "sha256:d231d2d9c97f7529b91230acefd4fb0ec9e648a1b7626632ad5fa7c448f1a74a",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "缺少核心问题、证据、推导或收束判断中的任一关键环节。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S002",
+      "source_file": "opening_rules.md",
+      "source_section": "一、开头唯一目标 + 四、隐性设问",
+      "name": "开头制造具体认知缺口",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "读完前三句话，读者能否明确复述‘接下来想知道什么’？",
+      "pass_condition": "形成具体阅读期待；可以显式提问，也可以隐含在场景/反差中。",
+      "fail_condition": "只有背景介绍，没有阅读驱动力。",
+      "exceptions": [
+        "不要求问号。",
+        "类型E可豁免深层设问。"
+      ],
+      "semantic_hash": "sha256:9fb07b2137f6440c107712fe604eaaccba4d851864566a8c9e4ff16844812844",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只有背景介绍，没有阅读驱动力。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S003",
+      "source_file": "opening_rules.md",
+      "source_section": "三、开头到正文的转场",
+      "name": "开头必须有落点句",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "开头的场景/历史/体验是否被一句落点连接到正文主体？",
+      "pass_condition": "存在明确转场，不让开头空转。",
+      "fail_condition": "故事讲完后突然跳到正文。",
+      "exceptions": [],
+      "semantic_hash": "sha256:9298dce8a16fad9744796a60af832285fcdfc151b235605f012bcd6d68abe9a7",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "故事讲完后突然跳到正文。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S004",
+      "source_file": "structure_rules.md",
+      "source_section": "三、反证空间",
+      "name": "反证内容按需进入正文",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "当前核心判断是否触发了反例/风险/替代解释检查，且这些内容是否有必要进入正文才能避免误导？",
+      "pass_condition": "未触发则N/A；触发后，仅在其会实质改变读者对结论边界的理解时写入正文。",
+      "fail_condition": "存在明显会改变结论边界的重要局限，却完全省略，导致正文结论显得过度确定。",
+      "exceptions": [
+        "不要求固定反面段落。",
+        "不要求为了形式上的客观而面面俱到。"
+      ],
+      "semantic_hash": "sha256:2ee53c0c57d8067236753233dfdfbbf48f0e9a698322582d2424d45eba2f58d2",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "存在明显会改变结论边界的重要局限，却完全省略，导致正文结论显得过度确定。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S005",
+      "source_file": "structure_rules.md",
+      "source_section": "四、排比小标题检验",
+      "name": "小标题关系真实",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "小标题是并列还是递进？对应的打乱/跳跃测试是否通过？",
+      "pass_condition": "并列边界清晰；递进中间环节不可随意删除。",
+      "fail_condition": "为凑结构强行拆成三段，案例可互换。",
+      "exceptions": [],
+      "semantic_hash": "sha256:45d97023d52d966788748f183619691ca7087ccc54d30876dcbd65464e4fd30d",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "为凑结构强行拆成三段，案例可互换。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S006",
+      "source_file": "structure_rules.md",
+      "source_section": "五、去尾测试",
+      "name": "正文先于抒情收尾立住",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "删除最后1-2段抒情收尾后，正文是否仍能独立完成核心任务？",
+      "pass_condition": "正文已经立住判断/解释/立场。",
+      "fail_condition": "结尾承担了本应由正文完成的论证。",
+      "exceptions": [
+        "类型E以信息任务完成为准。"
+      ],
+      "semantic_hash": "sha256:157aaeff437a1f5df0819925da404672afaea5a72085cba1f12ed3f789cf4450",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "结尾承担了本应由正文完成的论证。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S101",
+      "source_file": "content_values.md",
+      "source_section": "七、类型C",
+      "name": "C类结构链",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "C"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否形成问题/指标→数据口径→解释→边界→决策含义？",
+      "pass_condition": "五个功能完整或有合理合并。",
+      "fail_condition": "直接从数字跳到结论。",
+      "exceptions": [],
+      "semantic_hash": "sha256:767944756471e02279809cbc79d417839bcf9e6c5e1dc9e4cc8d1ff1ea323277",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "直接从数字跳到结论。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S201",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型D",
+      "name": "D类结构链",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "D"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否形成具体事件→立场→事实与理由→边界/自我反证→收束？",
+      "pass_condition": "立场与事实之间有清楚推导。",
+      "fail_condition": "情绪先行、事实只是点缀。",
+      "exceptions": [],
+      "semantic_hash": "sha256:be7525b58819fd3f953fc0c29e4472a07f2331bceb5b7a2c720d3f727dd4d63d",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "情绪先行、事实只是点缀。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "S301",
+      "source_file": "topic_rules.md",
+      "source_section": "二、类型E",
+      "name": "E类信息结构",
+      "stage": "STRUCTURE",
+      "applies_to": [
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否清楚说明范围、截止时间、分类与来源？",
+      "pass_condition": "读者能快速定位信息。",
+      "fail_condition": "信息杂乱、无法检索。",
+      "exceptions": [],
+      "semantic_hash": "sha256:f452cfa51b4c26236781bcd70c791a7c1f83b27a24ede90daeaa85bf03cf3f24",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "信息杂乱、无法检索。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X001",
+      "source_file": "expression_rules.md",
+      "source_section": "一、判断句要机制",
+      "name": "判断句不靠模板",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "判断句是否由具体机制支撑，而非靠固定转折句式制造深刻感？",
+      "pass_condition": "机制清楚，句式自由。",
+      "fail_condition": "只换模板句式，没有新增机制。",
+      "exceptions": [],
+      "semantic_hash": "sha256:ed31c71dac3e4829f8a73c0ebc8a113cad6a1bb47b0fc9d82eefdba9286bea5b",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "只换模板句式，没有新增机制。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X002",
+      "source_file": "expression_rules.md",
+      "source_section": "二、抽象词汇",
+      "name": "抽象判断必须被具体证据兑现",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "抽象概括是否在同段或紧邻上下文被案例、数字、场景或具体主体兑现？",
+      "pass_condition": "抽象词背后有可核查内容。",
+      "fail_condition": "连续抽象概括，无具体支撑。",
+      "exceptions": [
+        "不设置词汇黑名单。",
+        "不要求机械地恰好下一句举例。"
+      ],
+      "semantic_hash": "sha256:9083c2cca330bbf7bedec5008f867c6470a3b2d156e977b03b94613876d1696f",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "连续抽象概括，无具体支撑。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X003",
+      "source_file": "expression_rules.md",
+      "source_section": "三、具体名词与抽象名词比例",
+      "name": "核心判断避免纯抽象名词堆叠",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "核心判断句中是否有具体主体、动作、项目或场景？",
+      "pass_condition": "至少能定位具体主体或动作。",
+      "fail_condition": "结构、生态、价值、维度等抽象名词连续堆叠。",
+      "exceptions": [],
+      "semantic_hash": "sha256:85b6054f341ca7c6151d442d19cfc5efce3946becacc93d79df8c9fffaa9ab73",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "结构、生态、价值、维度等抽象名词连续堆叠。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X004",
+      "source_file": "expression_rules.md",
+      "source_section": "三、碎片化与长句",
+      "name": "避免碎片化煽动",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MAJOR",
+      "evaluation_question": "是否连续三段以上每段仅一句且以问号结尾？",
+      "pass_condition": "没有通过密集碎片问句制造情绪。",
+      "fail_condition": "连续三段以上符合该特征。",
+      "exceptions": [],
+      "semantic_hash": "sha256:7d0bd196262d6177020c58b76306dc7389b36f54d4c9d98af645048654fb4964",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "连续三段以上符合该特征。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X005",
+      "source_file": "expression_rules.md",
+      "source_section": "三、碎片化与长句",
+      "name": "过度学术化长句",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "MINOR",
+      "evaluation_question": "是否存在超过60字且多层连接词嵌套的长句？",
+      "pass_condition": "信息层级清晰。",
+      "fail_condition": "句子过长导致逻辑负担。",
+      "exceptions": [],
+      "semantic_hash": "sha256:1cdbe265e1c574ce0267656c95c03c3137f315b1b1d1eea224b82fd622242092",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "句子过长导致逻辑负担。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "X006",
+      "source_file": "expression_rules.md",
+      "source_section": "四、叙事与信息融合",
+      "name": "独立信息框风险",
+      "stage": "EXPRESSION",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "severity": "MINOR",
+      "evaluation_question": "背景资料是否用TIPS/项目符号等独立信息框割裂叙事？",
+      "pass_condition": "核心信息被编织进连续叙事。",
+      "fail_condition": "重要判断被放进容易跳过的信息框。",
+      "exceptions": [
+        "若信息框承载核心判断，严重度升级为MAJOR。"
+      ],
+      "semantic_hash": "sha256:6c45957b33a2dcdc951a3f0040eb3b1879384c2aaf02aec3134f0906528ee71d",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "重要判断被放进容易跳过的信息框。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "F001",
+      "source_file": "review_rules.md",
+      "source_section": "一、终审五问",
+      "name": "终审只汇总既有规则",
+      "stage": "FINAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "是否仍存在上游Gate未解决的BLOCKER？",
+      "pass_condition": "不存在。",
+      "fail_condition": "任一上游BLOCKER遗留。",
+      "exceptions": [],
+      "semantic_hash": "sha256:23b8f99ae00ff38e47623c53cd37009510b9d6dcb093458e4a8ba83ec96ab648",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "任一上游BLOCKER遗留。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "F002",
+      "source_file": "review_rules.md",
+      "source_section": "二、严重程度分级",
+      "name": "严重度分级执行",
+      "stage": "FINAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "问题是否已按BLOCKER/MAJOR/MINOR正确分级？",
+      "pass_condition": "一级问题阻塞发布；二级问题优先修复；三级问题不强制。",
+      "fail_condition": "把风格小问题当致命问题，或放过事实/逻辑BLOCKER。",
+      "exceptions": [],
+      "semantic_hash": "sha256:fae50cb9706d445b6c30e781c424a83d7a24bb9b64170b21e8ccd361a9392ed0",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "把风格小问题当致命问题，或放过事实/逻辑BLOCKER。",
+        "may_create_new_criterion": false
+      }
+    },
+    {
+      "rule_id": "F003",
+      "source_file": "content_values.md",
+      "source_section": "四、真实永远优先于精彩",
+      "name": "终审判断克制度",
+      "stage": "FINAL",
+      "applies_to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "severity": "BLOCKER",
+      "evaluation_question": "全文最终判断的确定性是否与证据强度匹配？",
+      "pass_condition": "事实、推断和判断边界清楚；没有为了显得深刻而把可能性写成确定性。",
+      "fail_condition": "存在明显过度归因、过度外推或虚构确定性。",
+      "exceptions": [],
+      "semantic_hash": "sha256:8ba8344e9e66b280791593dac18d7055535978c45b65878afe28e284248065fd",
+      "execution": {
+        "output_on_pass": "ID_ONLY",
+        "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
+        "allowed_feedback_meaning": "存在明显过度归因、过度外推或虚构确定性。",
+        "may_create_new_criterion": false
+      }
+    }
+  ],
+  "registry_semantic_hash": "sha256:b9b0009fd9f6c9a9483ef925f2bdf0f9120f6a1bb75545289691d810bebeeab2"
+}

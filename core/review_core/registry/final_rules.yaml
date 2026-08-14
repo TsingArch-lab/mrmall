@@ -1,0 +1,38 @@
+version: "0.2"
+rules:
+  - rule_id: F001
+    source_file: review_rules.md
+    source_section: 一、终审五问
+    name: 终审只汇总既有规则
+    stage: FINAL
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "是否仍存在上游Gate未解决的BLOCKER？"
+    pass_condition: "不存在。"
+    fail_condition: "任一上游BLOCKER遗留。"
+    exceptions: []
+
+  - rule_id: F002
+    source_file: review_rules.md
+    source_section: 二、严重程度分级
+    name: 严重度分级执行
+    stage: FINAL
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "问题是否已按BLOCKER/MAJOR/MINOR正确分级？"
+    pass_condition: "一级问题阻塞发布；二级问题优先修复；三级问题不强制。"
+    fail_condition: "把风格小问题当致命问题，或放过事实/逻辑BLOCKER。"
+    exceptions: []
+
+
+  - rule_id: F003
+    source_file: content_values.md
+    source_section: 四、真实永远优先于精彩
+    name: 终审判断克制度
+    stage: FINAL
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "全文最终判断的确定性是否与证据强度匹配？"
+    pass_condition: "事实、推断和判断边界清楚；没有为了显得深刻而把可能性写成确定性。"
+    fail_condition: "存在明显过度归因、过度外推或虚构确定性。"
+    exceptions: []

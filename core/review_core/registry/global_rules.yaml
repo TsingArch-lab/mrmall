@@ -1,0 +1,50 @@
+version: "0.2"
+rules:
+  - rule_id: G001
+    source_file: content_values.md
+    source_section: 四、真实永远优先于精彩
+    name: 真实性优先
+    stage: GLOBAL
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "关键事实与结论是否来自可核查材料，而非模型补齐、猜测或未经标注的推断？"
+    pass_condition: "所有关键事实均可追溯；推断明确标注；证据不足时降低确定性或留白。"
+    fail_condition: "存在无法追溯却以事实口吻呈现的关键内容。"
+    exceptions: []
+
+  - rule_id: G002
+    source_file: content_values.md
+    source_section: 五、好的判断从具体事实里长出来
+    name: 事实先于判断
+    stage: GLOBAL
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "核心判断能否追溯到具体事实、数据、引语或操作细节？"
+    pass_condition: "核心判断至少有一条清晰证据链。"
+    fail_condition: "先有观点，再用零散案例装饰；或判断无法指出来源。"
+    exceptions:
+      - "类型D允许个人立场，但必须明确区分事实与个人判断。"
+
+  - rule_id: G003
+    source_file: content_values.md
+    source_section: 三、批的是逻辑，不是人
+    name: 批逻辑不批人
+    stage: GLOBAL
+    applies_to: [A,B,C,D,E]
+    severity: MAJOR
+    evaluation_question: "批评是否指向机制、决策与依据，而非人格化否定？"
+    pass_condition: "批评对象是具体决策逻辑、机制或证据。"
+    fail_condition: "通过羞辱、道德化或人格标签代替分析。"
+    exceptions: []
+
+  - rule_id: G004
+    source_file: content_values.md
+    source_section: 七、不同类型内容有不同价值来源
+    name: 类型先行
+    stage: ROUTER
+    applies_to: [A,B,C,D,E]
+    severity: BLOCKER
+    evaluation_question: "是否先明确内容类型，再使用对应标准？"
+    pass_condition: "内容已路由为A/B/C/D/E，且加载匹配规则。"
+    fail_condition: "直接用深度分析标准评价所有内容。"
+    exceptions: []

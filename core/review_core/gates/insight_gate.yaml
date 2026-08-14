@@ -1,0 +1,14 @@
+version: "0.2"
+gate: INSIGHT
+always_apply: [G002]
+rules_by_type:
+  A: [I001,I002,I003,I004,I005,I006]
+  B: [I001,I002,I003,I004,I005,I006]
+  C: [I004,I005,I006,I101,I102]
+  D: [I004,I005,I006,I201]
+  E: [I301]
+aggregation:
+  any_blocker_fail: "REVISE"
+  major_policy: "MAJOR不单独阻塞，但必须记录"
+on_pass: STRUCTURE
+on_revise: INSIGHT

@@ -1,0 +1,156 @@
+version: "0.4.0"
+name: RULE_FIRST_REVIEW_RUNTIME
+purpose: "完整稿件审核的低自由度、低调用次数执行链。"
+
+principles:
+  - "Rules are the only content-quality source of truth."
+  - "No Rule, No Feedback."
+  - "No Rule, No Block."
+  - "Evaluation starts from applicable Rule IDs, never from free-form editorial critique."
+  - "Gate aggregation is deterministic and must not be delegated to the LLM."
+
+modes:
+  FULL_ARTICLE_REVIEW:
+    description: "已有完整稿件的审核/回测。优先使用。"
+    max_default_llm_calls: 2
+    calls:
+      - id: RULE_BATCH_EVALUATOR
+        model_role: "reasoning"
+        input:
+          - content_type
+          - article
+          - applicable_rules_compact
+          - verification_results_if_available
+        output: rule_evaluation_result
+      - id: FEEDBACK_COMPOSER
+        model_role: "low_temperature_language_formatter"
+        input:
+          - failed_rules_only
+          - gate_decision
+          - dimension_states
+          - verification_results
+          - passed_rule_strength_candidates
+        output: feedback_candidates_with_provenance
+    conditional_calls:
+      - id: ADJUDICATOR
+        trigger: "UNRESOLVED exists OR provenance validator rejects a material feedback candidate"
+        scope: "only unresolved/rejected items; never rerun all rules"
+    routing:
+      content_type_source_priority:
+        - "explicit user/editor selection"
+        - "existing workflow metadata"
+        - "ROUTER lightweight classification"
+      note: "若内容类型已知，不调用 Router 模型。"
+
+  CREATION_STAGE:
+    description: "从选题到成稿的生产流程。保持 Gate 分阶段运行。"
+    behavior: "每阶段批量执行该 Gate 的 Rule IDs；不逐 Rule 调模型。"
+
+applicability_compiler:
+  deterministic: true
+  algorithm:
+    - "load Gate rule IDs"
+    - "filter by content_type / always_apply"
+    - "apply explicit exceptions only"
+    - "deduplicate Rule IDs"
+  forbidden:
+    - "semantic guessing of extra rules"
+    - "adding rules because model thinks they are relevant"
+
+rule_batch_evaluator:
+  single_batch_default: true
+  statuses: [PASS, FAIL, NA, UNRESOLVED]
+  instructions:
+    - "Evaluate only supplied Rule IDs."
+    - "Do not write an overall critique."
+    - "Do not infer any criterion absent from each rule."
+    - "PASS returns Rule ID only."
+    - "FAIL returns Rule ID, exact article evidence, and a narrow match explanation against fail_condition."
+    - "NA requires an explicit exception or non-applicability basis."
+    - "UNRESOLVED is operational uncertainty, not a quality judgement."
+    - "Never convert uncertainty into FAIL merely to be safe."
+  compact_output: true
+
+verification:
+  execution: "parallel_or_pre_evaluation"
+  scope_file: "agents/verification_search_spec.md"
+  rule_effect: "verification results are evidence inputs; they never create independent penalties"
+  author_judgements_search: false
+
+gate_aggregator:
+  llm: false
+  deterministic: true
+  source: "existing gates/*.yaml only"
+  rules:
+    - "Compute each Gate decision from FAIL Rule IDs + existing severity/aggregation config."
+    - "UNRESOLVED cannot itself create REVISE/STOP; it may trigger targeted adjudication."
+    - "No overall-feel override."
+
+dimension_mapper:
+  llm: false
+  deterministic: true
+  map:
+    TOPIC: "选题价值"
+    EVIDENCE: "证据支撑"
+    GLOBAL_TRUTH: "证据支撑"
+    INSIGHT: "观点质量"
+    STRUCTURE: "结构逻辑"
+    EXPRESSION: "表达质量"
+  negative_state:
+    rule: "only existing Rule FAILs can create 有明显问题"
+  pass_state:
+    rule: "no blocking failure => at least 达标"
+  outstanding_state:
+    rule: "optional; may only be emitted from explicit passed-rule evidence, never used for Gate decisions"
+
+feedback_composer:
+  source: "FAIL rules only for negative feedback"
+  forbidden_inputs:
+    - "full free-form editorial critique"
+    - "model-generated improvement suggestions"
+    - "candidate rules"
+  output_contract:
+    - "Every negative sentence belongs to one feedback_candidate."
+    - "Every feedback_candidate contains supporting_rule_ids."
+    - "Its meaning must be a subset of the union of supporting rules' fail_condition meanings."
+    - "Clustering may compress duplicate symptoms but may not broaden meaning."
+  no_solution_policy: true
+
+provenance_validator:
+  llm: false
+  fail_closed: true
+  checks:
+    - "all supporting_rule_ids exist"
+    - "all supporting Rule IDs are FAIL in current evaluation"
+    - "article evidence is present"
+    - "source files/sections match compiled registry"
+    - "feedback has no unsupported Rule ID"
+  on_reject: "DROP feedback candidate; optionally send only that candidate to ADJUDICATOR"
+
+cost_controls:
+  - "Never run one LLM call per Rule."
+  - "Use compact compiled registry, not full source Markdown, in routine evaluation."
+  - "PASS output is ID-only."
+  - "Feedback Composer receives FAIL rules only."
+  - "Use targeted adjudication only for UNRESOLVED/rejected candidates."
+  - "Cache compiled Registry by semantic hash."
+  - "Skip Router call when content type is supplied by UI/workflow."
+
+# v0.4.1 — Markdown Rule Source
+rule_source:
+  single_source_of_truth: "rules/*.md"
+  registry_is_generated: true
+  allow_registry_as_authoring_source: false
+  allow_runtime_rule_creation: false
+  allow_agent_rule_creation: false
+  allow_gate_rule_creation: false
+
+preflight_commands:
+  - "python engine/compile_rules.py"
+  - "python engine/validate_rule_source.py"
+
+rule_replacement_workflow:
+  - "replace_or_edit_rules_markdown"
+  - "compile_registry_from_scratch"
+  - "validate_rule_source"
+  - "run_rule_first_review"

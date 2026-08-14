@@ -1,0 +1,76 @@
+version: "0.2"
+rules:
+  - rule_id: X001
+    source_file: expression_rules.md
+    source_section: 一、判断句要机制
+    name: 判断句不靠模板
+    stage: EXPRESSION
+    applies_to: [A,B,C,D]
+    severity: MAJOR
+    evaluation_question: "判断句是否由具体机制支撑，而非靠固定转折句式制造深刻感？"
+    pass_condition: "机制清楚，句式自由。"
+    fail_condition: "只换模板句式，没有新增机制。"
+    exceptions: []
+
+  - rule_id: X002
+    source_file: expression_rules.md
+    source_section: 二、抽象词汇
+    name: 抽象判断必须被具体证据兑现
+    stage: EXPRESSION
+    applies_to: [A,B,C,D,E]
+    severity: MAJOR
+    evaluation_question: "抽象概括是否在同段或紧邻上下文被案例、数字、场景或具体主体兑现？"
+    pass_condition: "抽象词背后有可核查内容。"
+    fail_condition: "连续抽象概括，无具体支撑。"
+    exceptions:
+      - "不设置词汇黑名单。"
+      - "不要求机械地恰好下一句举例。"
+
+  - rule_id: X003
+    source_file: expression_rules.md
+    source_section: 三、具体名词与抽象名词比例
+    name: 核心判断避免纯抽象名词堆叠
+    stage: EXPRESSION
+    applies_to: [A,B,C,D,E]
+    severity: MAJOR
+    evaluation_question: "核心判断句中是否有具体主体、动作、项目或场景？"
+    pass_condition: "至少能定位具体主体或动作。"
+    fail_condition: "结构、生态、价值、维度等抽象名词连续堆叠。"
+    exceptions: []
+
+  - rule_id: X004
+    source_file: expression_rules.md
+    source_section: 三、碎片化与长句
+    name: 避免碎片化煽动
+    stage: EXPRESSION
+    applies_to: [A,B,C,D,E]
+    severity: MAJOR
+    evaluation_question: "是否连续三段以上每段仅一句且以问号结尾？"
+    pass_condition: "没有通过密集碎片问句制造情绪。"
+    fail_condition: "连续三段以上符合该特征。"
+    exceptions: []
+
+  - rule_id: X005
+    source_file: expression_rules.md
+    source_section: 三、碎片化与长句
+    name: 过度学术化长句
+    stage: EXPRESSION
+    applies_to: [A,B,C,D,E]
+    severity: MINOR
+    evaluation_question: "是否存在超过60字且多层连接词嵌套的长句？"
+    pass_condition: "信息层级清晰。"
+    fail_condition: "句子过长导致逻辑负担。"
+    exceptions: []
+
+  - rule_id: X006
+    source_file: expression_rules.md
+    source_section: 四、叙事与信息融合
+    name: 独立信息框风险
+    stage: EXPRESSION
+    applies_to: [A,B,C,D]
+    severity: MINOR
+    evaluation_question: "背景资料是否用TIPS/项目符号等独立信息框割裂叙事？"
+    pass_condition: "核心信息被编织进连续叙事。"
+    fail_condition: "重要判断被放进容易跳过的信息框。"
+    exceptions:
+      - "若信息框承载核心判断，严重度升级为MAJOR。"

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mall Content OS</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="eyebrow">MALL CONTENT OS · REVIEW CORE</div>
+      <h1>文章质量审核</h1>
+      <p>基于 Markdown Rules 的 Rule-first 审核。模型负责执行规则，Gate 由程序确定。</p>
+    </header>
+
+    <section class="card editor">
+      <div class="row">
+        <label>文章类型
+          <select id="contentType">
+            <option value="AUTO">自动判断</option>
+            <option value="A">A · 企业/项目深度分析</option>
+            <option value="B">B · 行业现象/趋势分析</option>
+            <option value="C">C · 数据/研究解读</option>
+            <option value="D">D · 内省/态度声明</option>
+            <option value="E">E · 信息汇总</option>
+          </select>
+        </label>
+        <label class="grow">后端 API 地址
+          <input id="apiBase" placeholder="https://你的后端.onrender.com" />
+        </label>
+        <label class="grow">访问口令（不是模型 API Key）
+          <input id="accessToken" type="password" placeholder="如后端设置 APP_ACCESS_TOKEN，请在这里填写" />
+        </label>
+      </div>
+      <div class="row single-note">模型 API Key 只放 Render 后端环境变量，绝不要填在网页里。</div>
+      <label>待审核文章
+        <textarea id="article" placeholder="把完整文章粘贴到这里……"></textarea>
+      </label>
+      <div class="actions">
+        <button id="reviewBtn">开始审核</button>
+        <span id="status"></span>
+      </div>
+    </section>
+
+    <section id="result" class="card result hidden">
+      <div class="result-head">
+        <div>
+          <div class="eyebrow">最终判断</div>
+          <h2 id="judgement"></h2>
+        </div>
+        <div class="meta" id="meta"></div>
+      </div>
+
+      <h3>分项评价</h3>
+      <div id="dimensions" class="dimensions"></div>
+
+      <div id="diagnosisWrap">
+        <h3>核心诊断</h3>
+        <p id="diagnosis"></p>
+      </div>
+
+      <h3>问题清单</h3>
+      <div id="issues"></div>
+
+      <h3>值得保留</h3>
+      <ul id="strengths"></ul>
+
+      <div id="verifyNote" class="notice hidden"></div>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

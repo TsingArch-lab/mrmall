@@ -1,0 +1,115 @@
+version: "0.2"
+rules:
+  - rule_id: S001
+    source_file: structure_rules.md
+    source_section: 一、底层逻辑链
+    name: A/B完整论证闭环
+    stage: STRUCTURE
+    applies_to: [A,B]
+    severity: BLOCKER
+    evaluation_question: "文章是否完成设问→证据→推导→收束判断？"
+    pass_condition: "核心问题、证据、推导和判断形成完整闭环；反例/风险/替代解释仅按I006条件触发。"
+    fail_condition: "缺少核心问题、证据、推导或收束判断中的任一关键环节。"
+    exceptions:
+      - "反证不再作为每篇文章的固定结构要求。"
+
+  - rule_id: S002
+    source_file: opening_rules.md
+    source_section: 一、开头唯一目标 + 四、隐性设问
+    name: 开头制造具体认知缺口
+    stage: STRUCTURE
+    applies_to: [A,B,C,D]
+    severity: BLOCKER
+    evaluation_question: "读完前三句话，读者能否明确复述‘接下来想知道什么’？"
+    pass_condition: "形成具体阅读期待；可以显式提问，也可以隐含在场景/反差中。"
+    fail_condition: "只有背景介绍，没有阅读驱动力。"
+    exceptions:
+      - "不要求问号。"
+      - "类型E可豁免深层设问。"
+
+  - rule_id: S003
+    source_file: opening_rules.md
+    source_section: 三、开头到正文的转场
+    name: 开头必须有落点句
+    stage: STRUCTURE
+    applies_to: [A,B,C,D]
+    severity: MAJOR
+    evaluation_question: "开头的场景/历史/体验是否被一句落点连接到正文主体？"
+    pass_condition: "存在明确转场，不让开头空转。"
+    fail_condition: "故事讲完后突然跳到正文。"
+    exceptions: []
+
+  - rule_id: S004
+    source_file: structure_rules.md
+    source_section: 三、反证空间
+    name: 反证内容按需进入正文
+    stage: STRUCTURE
+    applies_to: [A,B,C,D]
+    severity: MAJOR
+    evaluation_question: "当前核心判断是否触发了反例/风险/替代解释检查，且这些内容是否有必要进入正文才能避免误导？"
+    pass_condition: "未触发则N/A；触发后，仅在其会实质改变读者对结论边界的理解时写入正文。"
+    fail_condition: "存在明显会改变结论边界的重要局限，却完全省略，导致正文结论显得过度确定。"
+    exceptions:
+      - "不要求固定反面段落。"
+      - "不要求为了形式上的客观而面面俱到。"
+
+  - rule_id: S005
+    source_file: structure_rules.md
+    source_section: 四、排比小标题检验
+    name: 小标题关系真实
+    stage: STRUCTURE
+    applies_to: [A,B,C,D,E]
+    severity: MAJOR
+    evaluation_question: "小标题是并列还是递进？对应的打乱/跳跃测试是否通过？"
+    pass_condition: "并列边界清晰；递进中间环节不可随意删除。"
+    fail_condition: "为凑结构强行拆成三段，案例可互换。"
+    exceptions: []
+
+  - rule_id: S006
+    source_file: structure_rules.md
+    source_section: 五、去尾测试
+    name: 正文先于抒情收尾立住
+    stage: STRUCTURE
+    applies_to: [A,B,C,D]
+    severity: BLOCKER
+    evaluation_question: "删除最后1-2段抒情收尾后，正文是否仍能独立完成核心任务？"
+    pass_condition: "正文已经立住判断/解释/立场。"
+    fail_condition: "结尾承担了本应由正文完成的论证。"
+    exceptions:
+      - "类型E以信息任务完成为准。"
+
+  - rule_id: S101
+    source_file: content_values.md
+    source_section: 七、类型C
+    name: C类结构链
+    stage: STRUCTURE
+    applies_to: [C]
+    severity: BLOCKER
+    evaluation_question: "是否形成问题/指标→数据口径→解释→边界→决策含义？"
+    pass_condition: "五个功能完整或有合理合并。"
+    fail_condition: "直接从数字跳到结论。"
+    exceptions: []
+
+  - rule_id: S201
+    source_file: topic_rules.md
+    source_section: 二、类型D
+    name: D类结构链
+    stage: STRUCTURE
+    applies_to: [D]
+    severity: BLOCKER
+    evaluation_question: "是否形成具体事件→立场→事实与理由→边界/自我反证→收束？"
+    pass_condition: "立场与事实之间有清楚推导。"
+    fail_condition: "情绪先行、事实只是点缀。"
+    exceptions: []
+
+  - rule_id: S301
+    source_file: topic_rules.md
+    source_section: 二、类型E
+    name: E类信息结构
+    stage: STRUCTURE
+    applies_to: [E]
+    severity: BLOCKER
+    evaluation_question: "是否清楚说明范围、截止时间、分类与来源？"
+    pass_condition: "读者能快速定位信息。"
+    fail_condition: "信息杂乱、无法检索。"
+    exceptions: []
