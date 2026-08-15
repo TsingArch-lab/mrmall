@@ -242,7 +242,13 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
             ) from first_exc
 
 
-async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
+async def evaluate_rule_subset(
+    article: str,
+    content_type: str,
+    verification_context,
+    rule_ids: list[str],
+    reasoning_effort: str | None = None,
+):
     """Evaluate only an explicit subset of already-applicable Rules.
 
     Used by the fact-check performance path after the main evaluator has run in
@@ -271,8 +277,9 @@ async def evaluate_rule_subset(article: str, content_type: str, verification_con
     )
     provider = get_provider()
     raw = await provider.generate_json(
-        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的事实敏感 Rules，不得重审其他规则。",
+        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的 Rules，不得重审其他规则。",
         user,
+        reasoning_effort=reasoning_effort,
     )
     return normalize_rule_evaluation(
         raw,
@@ -704,7 +711,62 @@ async def review_article(
             logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
             return None
 
-    eval_result, fact_outcome = await asyncio.gather(_main_evaluator_task(), _fact_search_task())
+    async def _two_rule_diagnostic_task():
+        diagnostic_ids = [rid for rid in ["S005", "S007"] if rid in applicable_rule_ids(content_type)]
+        if not diagnostic_ids:
+            logger.info("[diagnostic] two_rule skipped rules=S005,S007 reason=not_applicable")
+            return None
+        t = time.perf_counter()
+        logger.info("[diagnostic] two_rule start rules=%s reasoning_effort=max", diagnostic_ids)
+        try:
+            value = await asyncio.wait_for(
+                evaluate_rule_subset(
+                    article,
+                    content_type,
+                    preliminary_verification_context,
+                    diagnostic_ids,
+                    reasoning_effort="max",
+                ),
+                timeout=settings.llm_evaluator_stage_timeout_seconds,
+            )
+            failed = {x.get("rule_id"): x for x in value.get("failed_rules", [])}
+            unresolved = {x.get("rule_id"): x for x in value.get("unresolved_rules", [])}
+            statuses = {}
+            for rid in diagnostic_ids:
+                if rid in failed:
+                    statuses[rid] = "FAIL"
+                elif rid in unresolved:
+                    statuses[rid] = "UNRESOLVED"
+                elif rid in value.get("na_rule_ids", []):
+                    statuses[rid] = "NA"
+                elif rid in value.get("passed_rule_ids", []):
+                    statuses[rid] = "PASS"
+                else:
+                    statuses[rid] = "MISSING"
+            logger.info(
+                "[diagnostic] two_rule done elapsed=%.2fs statuses=%s",
+                time.perf_counter() - t,
+                json.dumps(statuses, ensure_ascii=False),
+            )
+            for rid, item in failed.items():
+                logger.info(
+                    "[diagnostic] two_rule fail rule=%s evidence=%s explanation=%s",
+                    rid,
+                    json.dumps(item.get("article_evidence", []), ensure_ascii=False),
+                    item.get("match_explanation", ""),
+                )
+            return value
+        except Exception as exc:
+            logger.warning(
+                "[diagnostic] two_rule error elapsed=%.2fs error=%s",
+                time.perf_counter() - t,
+                exc,
+            )
+            return None
+
+    eval_result, fact_outcome, _two_rule_diagnostic = await asyncio.gather(
+        _main_evaluator_task(), _fact_search_task(), _two_rule_diagnostic_task()
+    )
     logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
 
     if verify_facts:
