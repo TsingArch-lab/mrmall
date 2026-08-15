@@ -241,6 +241,49 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
             ) from first_exc
 
 
+async def diagnostic_evaluate_single_rule(
+    article: str, content_type: str, verification_context, rule_id: str
+):
+    """Run one already-applicable Rule in isolation for diagnostics only.
+
+    The returned result is never merged into the formal evaluation and therefore
+    cannot affect Gate aggregation, feedback, or author-facing output.
+    """
+    applicable = set(applicable_rule_ids(content_type))
+    if rule_id not in applicable:
+        return None
+
+    reg = rules_by_id()
+    keys = [
+        "rule_id", "name", "stage", "severity", "evaluation_question",
+        "pass_condition", "fail_condition", "exceptions",
+    ]
+    rule = [{k: reg[rule_id].get(k) for k in keys}]
+    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+    user = _render(
+        evaluator,
+        {
+            "CONTENT_TYPE": content_type,
+            "APPLICABLE_RULES_COMPACT": rule,
+            "VERIFICATION_RESULTS": verification_context.results,
+            "VERIFICATION_GUARD": verification_guard_text(verification_context),
+            "ARTICLE": article,
+        },
+    )
+    provider = get_provider()
+    raw = await provider.generate_json(
+        "你是 SINGLE_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的这一条 Rule。"
+        "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
+        user,
+    )
+    return normalize_rule_evaluation(
+        raw,
+        content_type=content_type,
+        supplied_rule_ids=[rule_id],
+        verification_context=verification_context,
+    )
+
+
 async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
     """Evaluate only an explicit subset of already-applicable Rules.
 
@@ -703,7 +746,65 @@ async def review_article(
             logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
             return None
 
-    eval_result, fact_outcome = await asyncio.gather(_main_evaluator_task(), _fact_search_task())
+    async def _single_rule_diagnostic_task():
+        rule_id = "S007"
+        if rule_id not in applicable_rule_ids(content_type):
+            logger.info("[diagnostic] single_rule skipped rule=%s reason=not_applicable", rule_id)
+            return None
+        t = time.perf_counter()
+        logger.info("[diagnostic] single_rule start rule=%s", rule_id)
+        try:
+            value = await asyncio.wait_for(
+                diagnostic_evaluate_single_rule(
+                    article, content_type, preliminary_verification_context, rule_id
+                ),
+                timeout=settings.llm_evaluator_stage_timeout_seconds,
+            )
+            if value is None:
+                logger.info("[diagnostic] single_rule done rule=%s status=SKIPPED elapsed=%.2fs", rule_id, time.perf_counter() - t)
+                return None
+            failed = value.get("failed_rules", [])
+            unresolved = value.get("unresolved_rules", [])
+            if failed:
+                status = "FAIL"
+                detail = failed[0]
+                logger.info(
+                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs evidence=%s explanation=%s",
+                    rule_id,
+                    status,
+                    time.perf_counter() - t,
+                    json.dumps(detail.get("article_evidence", []), ensure_ascii=False),
+                    detail.get("match_explanation", ""),
+                )
+            elif unresolved:
+                status = "UNRESOLVED"
+                logger.info(
+                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
+                    rule_id, status, time.perf_counter() - t
+                )
+            elif rule_id in value.get("na_rule_ids", []):
+                status = "NA"
+                logger.info(
+                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
+                    rule_id, status, time.perf_counter() - t
+                )
+            else:
+                status = "PASS"
+                logger.info(
+                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
+                    rule_id, status, time.perf_counter() - t
+                )
+            return value
+        except Exception as exc:
+            logger.warning(
+                "[diagnostic] single_rule error rule=%s elapsed=%.2fs error=%s",
+                rule_id, time.perf_counter() - t, exc
+            )
+            return None
+
+    eval_result, fact_outcome, _diagnostic_result = await asyncio.gather(
+        _main_evaluator_task(), _fact_search_task(), _single_rule_diagnostic_task()
+    )
     logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
 
     if verify_facts:
