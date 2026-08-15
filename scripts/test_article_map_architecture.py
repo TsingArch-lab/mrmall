@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.article_map import normalize_article_map
+from app.article_map import build_argument_blocks, normalize_article_map
 from app.execution_plan import MAP_AWARE_RULE_IDS, build_execution_plan
 from app.fact_search import normalize_claim_items
 from app.review_core import applicable_rule_ids
@@ -35,7 +35,7 @@ def main():
         assert rid in plan_a.direct_rule_ids, rid
 
     # 3) Article Map normalization is descriptive and exact-quote safe.
-    article = "第一段提出问题。第二段解释机制。第三段总结。"
+    article = "第一段提出问题。\n\n第二段解释机制。\n\n第三段总结。"
     raw = {
         "core_question": "文章在解释什么？",
         "thesis": "解释一个机制",
@@ -44,10 +44,16 @@ def main():
             {"unit_id":"y","heading":"机制","anchor_quote":"不存在的原句","role":"mechanism","main_claim":"解释机制","evidence_used":[],"mechanism":"X影响Y","relation_to_prior":"adds_mechanism","new_contribution":"增加机制"},
         ],
     }
-    m = normalize_article_map(raw, article)
+    blocks = build_argument_blocks(article)
+    # adapt synthetic labels to deterministic block ids
+    raw["units"][0]["block_id"] = blocks[0]["block_id"]
+    if len(blocks) > 1:
+        raw["units"][1]["block_id"] = blocks[1]["block_id"]
+    m = normalize_article_map(raw, article, blocks)
     assert m["state"] == "READY"
     assert m["units"][0]["anchor_quote"] == "第一段提出问题。"
-    assert m["units"][1]["anchor_quote"] == ""  # hallucinated evidence cannot propagate
+    assert m["units"][1]["anchor_quote"] != "不存在的原句"  # hallucinated evidence cannot propagate
+    assert m["units"][1]["anchor_quote"] in blocks[1]["text"]
     assert "quality" not in json.dumps(m, ensure_ascii=False).lower()
 
     # 4) Fact-claim priority is unchanged and Article Map can feed the same normalizer.

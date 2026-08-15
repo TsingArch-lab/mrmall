@@ -1,6 +1,6 @@
 version: "0.5.0"
 name: RULE_FIRST_REVIEW_RUNTIME
-purpose: "完整稿件审核的 Rule-first 执行链；v0.5 引入共享 Article Representation Layer 提升全文型 Rule 执行稳定性。"
+purpose: "完整稿件审核的 Rule-first 执行链；v0.5 引入共享 Article Representation Layer；v0.1.8.1 改为程序切分的保真 Argument Map，避免语义压缩隐藏重复。"
 
 principles:
   - "Rules are the only content-quality source of truth."
@@ -81,7 +81,8 @@ article_representation_layer:
   source_of_truth: "ARTICLE remains authoritative; map conflicts are ignored"
   fields:
     - "core_question / thesis"
-    - "major_argument_units"
+    - "deterministic_argument_blocks / paragraph_ids"
+    - "one source block -> one map unit; no semantic merging"
     - "unit_role / evidence / mechanism"
     - "relation_to_prior / new_contribution"
     - "fact_search_candidates_when_enabled"
@@ -157,7 +158,7 @@ provenance_validator:
 cost_controls:
   - "Never run one LLM call per Rule."
   - "Batch DIRECT_TEXT Rules and MAP_AWARE Rules separately; never per-Rule calls."
-  - "Overlap DIRECT_TEXT execution with Article Map generation."
+  - "Deterministically split Argument Blocks without an LLM call; overlap DIRECT_TEXT execution with Argument Map labeling."
   - "When fact search is enabled, reuse Article Map fact candidates instead of a separate claim-extraction call; fallback only if Map is unavailable."
   - "Use compact compiled registry, not full source Markdown, in routine evaluation."
   - "PASS output is ID-only."

@@ -10,9 +10,9 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["unit_id", "heading", "anchor_quote", "role", "main_claim", "evidence_used", "mechanism", "relation_to_prior", "new_contribution"],
+        "required": ["block_id", "heading", "anchor_quote", "role", "main_claim", "evidence_used", "mechanism", "relation_to_prior", "new_contribution"],
         "properties": {
-          "unit_id": {"type": "string"},
+          "block_id": {"type": "string"},
           "heading": {"type": "string"},
           "anchor_quote": {"type": "string"},
           "role": {"enum": ["opening", "background", "case", "evidence", "mechanism", "comparison", "inference", "summary", "transition", "conclusion", "other"]},
