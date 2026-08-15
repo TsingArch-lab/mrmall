@@ -1,4 +1,4 @@
-const APP_VERSION='0.1.9.0';
+const APP_VERSION='0.1.9.0-diagnostic';
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
 apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
