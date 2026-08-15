@@ -209,6 +209,7 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
     raw = await provider.generate_json(
         "你是严格的 RULE_BATCH_EVALUATOR。只能执行输入 Rules，必须严格按指定 JSON 契约输出。",
         user,
+        reasoning_effort="max",
     )
     try:
         return normalize_rule_evaluation(
@@ -239,123 +240,6 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
                 f"Rule Evaluator 输出未通过契约校验：{exc}. "
                 "为防止错误审稿，本次结果已中止。"
             ) from first_exc
-
-
-async def diagnostic_evaluate_single_rule(
-    article: str, content_type: str, verification_context, rule_id: str
-):
-    """Run one already-applicable Rule in isolation for diagnostics only.
-
-    The returned result is never merged into the formal evaluation and therefore
-    cannot affect Gate aggregation, feedback, or author-facing output.
-    """
-    applicable = set(applicable_rule_ids(content_type))
-    if rule_id not in applicable:
-        return None
-
-    reg = rules_by_id()
-    keys = [
-        "rule_id", "name", "stage", "severity", "evaluation_question",
-        "pass_condition", "fail_condition", "exceptions",
-    ]
-    rule = [{k: reg[rule_id].get(k) for k in keys}]
-    provider = get_provider()
-
-    if rule_id == "S005":
-        # Diagnostic experiment only: test S005 with a minimal "ownership test".
-        # This exposes whether the model can see cross-section boundary failure
-        # without Article Map, deletion tests, or any new content criterion.
-        diagnostic_user = f"""
-CONTENT_TYPE: {content_type}
-
-RULE:
-{json.dumps(rule[0], ensure_ascii=False, indent=2)}
-
-ARTICLE:
-{article}
-
-你现在只诊断 S005。不要评价文章总体好坏，也不要调用任何其他 Rule。
-
-先判断文章主要小标题之间属于并列还是递进关系。
-如果属于并列关系，只做一个“归属测试”：
-- 概括每个主要章节实际承担的论证对象；
-- 检查各章节中的主要事实、案例、机制和判断，是否有大量内容放到另一个并列小标题下也同样自然成立；
-- 重点判断这是少量正常关联，还是持续、成片的跨章节可互换，导致章节边界失效。
-
-不要因为几个章节都服务同一个总论点就判 FAIL；同一总论点完全可以从不同角度展开。
-也不要要求章节彼此绝对独立；少量呼应、铺垫、总结都可以接受。
-只有当多个主要章节的论证材料和判断大面积交叉、彼此可互换，导致小标题无法稳定区分各自承担什么时，才命中 S005 的失败条件。
-
-如果属于递进关系，则按现有 S005 的跳跃逻辑判断，不强行套用归属测试。
-
-先输出简洁诊断：
-1. relation_type：并列 / 递进 / 混合；
-2. section_roles：每个主要章节实际在论证什么；
-3. cross_assignment：列出最重要的跨章节可互换内容，若没有则为空；
-4. boundary_observation：边界是否清晰。
-
-完成后，再严格依据 S005 的 evaluation_question / pass_condition / fail_condition / exceptions 判定。
-
-只输出一个 JSON 对象，格式必须是：
-{{
-  "diagnostic_analysis": {{
-    "relation_type": "...",
-    "section_roles": [{{"section":"...","role":"..."}}],
-    "cross_assignment": [{{"content":"...","current_section":"...","also_fits":"...","why":"..."}}],
-    "boundary_observation": "..."
-  }},
-  "content_type": "{content_type}",
-  "evaluated_rule_ids": ["S005"],
-  "passed_rule_ids": [],
-  "failed_rules": [],
-  "na_rule_ids": [],
-  "unresolved_rules": []
-}}
-
-最终四个状态桶必须且只能有一个包含 S005：
-- PASS: passed_rule_ids=["S005"]
-- FAIL: failed_rules=[{{"rule_id":"S005","article_evidence":["原文证据1","原文证据2"],"match_explanation":"这些证据如何命中现有 fail_condition"}}]
-- NA: na_rule_ids=["S005"]
-- UNRESOLVED: unresolved_rules=[{{"rule_id":"S005","why_unresolved":"..."}}]
-
-不得新增判断标准。diagnostic_analysis 只用于观察你的识别过程，不进入正式审核。
-"""
-        raw = await provider.generate_json(
-            "你是 S005_DIAGNOSTIC_OWNERSHIP_TESTER。只做小标题关系与归属测试，再只依据现有 S005 判定。"
-            "不得参考其他 Rule，不得输出总体文章评价。只输出指定 JSON。",
-            diagnostic_user,
-        )
-        diagnostic_analysis = raw.pop("diagnostic_analysis", None) if isinstance(raw, dict) else None
-        if diagnostic_analysis is not None:
-            logger.info(
-                "[diagnostic] s005_ownership analysis=%s",
-                json.dumps(diagnostic_analysis, ensure_ascii=False),
-            )
-
-    else:
-        evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
-        user = _render(
-            evaluator,
-            {
-                "CONTENT_TYPE": content_type,
-                "APPLICABLE_RULES_COMPACT": rule,
-                "VERIFICATION_RESULTS": verification_context.results,
-                "VERIFICATION_GUARD": verification_guard_text(verification_context),
-                "ARTICLE": article,
-            },
-        )
-        raw = await provider.generate_json(
-            "你是 SINGLE_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的这一条 Rule。"
-            "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
-            user,
-        )
-
-    return normalize_rule_evaluation(
-        raw,
-        content_type=content_type,
-        supplied_rule_ids=[rule_id],
-        verification_context=verification_context,
-    )
 
 
 async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
@@ -820,65 +704,7 @@ async def review_article(
             logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
             return None
 
-    async def _single_rule_diagnostic_task():
-        rule_id = "S005"
-        if rule_id not in applicable_rule_ids(content_type):
-            logger.info("[diagnostic] single_rule skipped rule=%s reason=not_applicable", rule_id)
-            return None
-        t = time.perf_counter()
-        logger.info("[diagnostic] single_rule start rule=%s", rule_id)
-        try:
-            value = await asyncio.wait_for(
-                diagnostic_evaluate_single_rule(
-                    article, content_type, preliminary_verification_context, rule_id
-                ),
-                timeout=settings.llm_evaluator_stage_timeout_seconds,
-            )
-            if value is None:
-                logger.info("[diagnostic] single_rule done rule=%s status=SKIPPED elapsed=%.2fs", rule_id, time.perf_counter() - t)
-                return None
-            failed = value.get("failed_rules", [])
-            unresolved = value.get("unresolved_rules", [])
-            if failed:
-                status = "FAIL"
-                detail = failed[0]
-                logger.info(
-                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs evidence=%s explanation=%s",
-                    rule_id,
-                    status,
-                    time.perf_counter() - t,
-                    json.dumps(detail.get("article_evidence", []), ensure_ascii=False),
-                    detail.get("match_explanation", ""),
-                )
-            elif unresolved:
-                status = "UNRESOLVED"
-                logger.info(
-                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
-                    rule_id, status, time.perf_counter() - t
-                )
-            elif rule_id in value.get("na_rule_ids", []):
-                status = "NA"
-                logger.info(
-                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
-                    rule_id, status, time.perf_counter() - t
-                )
-            else:
-                status = "PASS"
-                logger.info(
-                    "[diagnostic] single_rule done rule=%s status=%s elapsed=%.2fs",
-                    rule_id, status, time.perf_counter() - t
-                )
-            return value
-        except Exception as exc:
-            logger.warning(
-                "[diagnostic] single_rule error rule=%s elapsed=%.2fs error=%s",
-                rule_id, time.perf_counter() - t, exc
-            )
-            return None
-
-    eval_result, fact_outcome, _diagnostic_result = await asyncio.gather(
-        _main_evaluator_task(), _fact_search_task(), _single_rule_diagnostic_task()
-    )
+    eval_result, fact_outcome = await asyncio.gather(_main_evaluator_task(), _fact_search_task())
     logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
 
     if verify_facts:
