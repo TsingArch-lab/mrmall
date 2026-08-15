@@ -3,7 +3,7 @@
   "content_semantics_version": "0.4.1-md-source",
   "runtime_version": "0.4.1",
   "single_source_of_truth": "rules/*.md",
-  "generated_at_utc": "2026-08-15T14:12:17.803859+00:00",
+  "generated_at_utc": "2026-08-15T14:43:34.639149+00:00",
   "rule_count": 49,
   "rules": [
     {
@@ -871,15 +871,15 @@
         "E"
       ],
       "severity": "MAJOR",
-      "evaluation_question": "小标题是并列还是递进？对应的打乱/跳跃测试是否通过？",
-      "pass_condition": "并列边界清晰；递进中间环节不可随意删除。",
-      "fail_condition": "为凑结构强行拆成三段，案例可互换。",
+      "evaluation_question": "小标题是并列还是递进？各章节是否有清晰、稳定的论证边界，对应的打乱/跳跃测试是否通过？",
+      "pass_condition": "并列章节各自承担清晰且可区分的论证任务，主要事实、案例、机制和判断有稳定归属；递进中间环节不可随意删除。",
+      "fail_condition": "为凑结构强行拆分；并列章节之间边界模糊，大量主要事实、案例、机制或判断可以无障碍地归入其他小标题，导致各部分实际论证对象持续交叉。",
       "exceptions": [],
-      "semantic_hash": "sha256:45d97023d52d966788748f183619691ca7087ccc54d30876dcbd65464e4fd30d",
+      "semantic_hash": "sha256:cea5c92f7c621f49aea03ebe88ae4d9a587e5e5c5e5e5c1d3a910a9fea931a4d",
       "execution": {
         "output_on_pass": "ID_ONLY",
         "output_on_fail": "EVIDENCE_AND_MATCH_ONLY",
-        "allowed_feedback_meaning": "为凑结构强行拆成三段，案例可互换。",
+        "allowed_feedback_meaning": "为凑结构强行拆分；并列章节之间边界模糊，大量主要事实、案例、机制或判断可以无障碍地归入其他小标题，导致各部分实际论证对象持续交叉。",
         "may_create_new_criterion": false
       }
     },
@@ -1247,5 +1247,5 @@
       }
     }
   ],
-  "registry_semantic_hash": "sha256:f85e97a8377390a6bb8902512cae7981fb74429f7d49739f401543719a46dfeb"
+  "registry_semantic_hash": "sha256:49cb55819c036179eef945f3f4b2b547b7e46cbd2f3699e591daf941479a1def"
 }
