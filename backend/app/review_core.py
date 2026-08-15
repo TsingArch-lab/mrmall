@@ -259,23 +259,98 @@ async def diagnostic_evaluate_single_rule(
         "pass_condition", "fail_condition", "exceptions",
     ]
     rule = [{k: reg[rule_id].get(k) for k in keys}]
-    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
-    user = _render(
-        evaluator,
-        {
-            "CONTENT_TYPE": content_type,
-            "APPLICABLE_RULES_COMPACT": rule,
-            "VERIFICATION_RESULTS": verification_context.results,
-            "VERIFICATION_GUARD": verification_guard_text(verification_context),
-            "ARTICLE": article,
-        },
-    )
     provider = get_provider()
-    raw = await provider.generate_json(
-        "你是 SINGLE_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的这一条 Rule。"
-        "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
-        user,
-    )
+
+    if rule_id == "S007":
+        # Diagnostic experiment only: force the model to expose whether it can
+        # actually identify repeated explanatory functions before it renders
+        # the S007 verdict. This does not change S007, formal Rule Results, Gate,
+        # feedback, or author-facing output.
+        diagnostic_user = f"""
+CONTENT_TYPE: {content_type}
+
+RULE:
+{json.dumps(rule[0], ensure_ascii=False, indent=2)}
+
+ARTICLE:
+{article}
+
+你现在只诊断 S007。不要评价文章总体好坏，也不要调用任何其他 Rule。
+
+在判定 PASS / FAIL 之前，必须先完成“重复解释组扫描”。
+请主动扫描全文，寻找后文与前文承担相同解释任务的内容。不要因为材料、案例、数据、概念或措辞不同，就自动认为存在论证增量。
+
+对你识别出的每一组候选重复，逐项回答：
+1. earlier_explanation：前文已经完成了什么解释任务；
+2. later_location：后文再次出现在哪里；
+3. new_content：后文新增了哪些事实、案例、数据、概念或措辞；
+4. new_explanation：后文是否增加了新的机制、条件、边界、关系或推论；若没有，明确写“无实质新增解释”；
+5. deletion_test：删除后文后，读者对作者“为什么这么判断”的理解是否会有实质损失；
+6. materiality：这种低推进是否明显、连续并占据实质篇幅。
+
+不要为了凑数量制造重复组；如果确实存在，请尽量列出最重要的 1-5 组。
+完成扫描后，再严格依据 S007 的 evaluation_question / pass_condition / fail_condition / exceptions 判定。
+
+只输出一个 JSON 对象，格式必须是：
+{{
+  "diagnostic_analysis": {{
+    "candidate_groups": [
+      {{
+        "earlier_explanation": "...",
+        "later_location": "...",
+        "new_content": "...",
+        "new_explanation": "...",
+        "deletion_test": "...",
+        "materiality": "..."
+      }}
+    ],
+    "overall_observation": "..."
+  }},
+  "content_type": "{content_type}",
+  "evaluated_rule_ids": ["S007"],
+  "passed_rule_ids": [],
+  "failed_rules": [],
+  "na_rule_ids": [],
+  "unresolved_rules": []
+}}
+
+最终四个状态桶必须且只能有一个包含 S007：
+- PASS: passed_rule_ids=["S007"]
+- FAIL: failed_rules=[{{"rule_id":"S007","article_evidence":["原文证据1","原文证据2"],"match_explanation":"这些证据如何命中现有 fail_condition"}}]
+- NA: na_rule_ids=["S007"]
+- UNRESOLVED: unresolved_rules=[{{"rule_id":"S007","why_unresolved":"..."}}]
+
+不得新增判断标准。diagnostic_analysis 只用于观察你的识别过程，不进入正式审核。
+"""
+        raw = await provider.generate_json(
+            "你是 S007_DIAGNOSTIC_SCANNER。先扫描重复解释组，再只依据现有 S007 判定。"
+            "不得参考其他 Rule，不得输出总体文章评价。只输出指定 JSON。",
+            diagnostic_user,
+        )
+        diagnostic_analysis = raw.pop("diagnostic_analysis", None) if isinstance(raw, dict) else None
+        if diagnostic_analysis is not None:
+            logger.info(
+                "[diagnostic] s007_scan analysis=%s",
+                json.dumps(diagnostic_analysis, ensure_ascii=False),
+            )
+    else:
+        evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+        user = _render(
+            evaluator,
+            {
+                "CONTENT_TYPE": content_type,
+                "APPLICABLE_RULES_COMPACT": rule,
+                "VERIFICATION_RESULTS": verification_context.results,
+                "VERIFICATION_GUARD": verification_guard_text(verification_context),
+                "ARTICLE": article,
+            },
+        )
+        raw = await provider.generate_json(
+            "你是 SINGLE_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的这一条 Rule。"
+            "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
+            user,
+        )
+
     return normalize_rule_evaluation(
         raw,
         content_type=content_type,
