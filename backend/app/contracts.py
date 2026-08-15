@@ -207,7 +207,7 @@ def normalize_rule_evaluation(
             if fail_is_only_unverified(item["rule_id"], item.get("match_explanation", ""), verification_context):
                 guarded_unresolved.append({
                     "rule_id": item["rule_id"],
-                    "why_unresolved": "外部事实核验未执行；仅凭‘无法核实/缺乏来源’不能判定该 Rule FAIL。",
+                    "why_unresolved": "仅凭‘无法核实/缺乏来源’不能判定事实类 Rule FAIL；未找到可靠依据不等于事实错误。",
                 })
             else:
                 kept_failed.append(item)

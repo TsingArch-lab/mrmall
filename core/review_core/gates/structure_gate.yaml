@@ -1,13 +1,41 @@
-version: "0.2"
+version: '0.2'
 gate: STRUCTURE
 rules_by_type:
-  A: [S001,S002,S003,S004,S005,S006]
-  B: [S001,S002,S003,S004,S005,S006]
-  C: [S002,S003,S005,S006,S101]
-  D: [S002,S003,S005,S006,S201]
-  E: [S005,S301]
+  A:
+  - S001
+  - S002
+  - S003
+  - S004
+  - S005
+  - S006
+  - S007
+  B:
+  - S001
+  - S002
+  - S003
+  - S004
+  - S005
+  - S006
+  - S007
+  C:
+  - S002
+  - S003
+  - S005
+  - S006
+  - S101
+  - S007
+  D:
+  - S002
+  - S003
+  - S005
+  - S006
+  - S201
+  - S007
+  E:
+  - S005
+  - S301
 aggregation:
-  any_blocker_fail: "REVISE"
-  major_policy: "MAJOR>=3时升级为REVISE"
+  any_blocker_fail: REVISE
+  major_policy: MAJOR>=3时升级为REVISE
 on_pass: DRAFTING
 on_revise: STRUCTURE

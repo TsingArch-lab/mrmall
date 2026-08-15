@@ -1,4 +1,4 @@
-# Mall Content OS Web v0.1.4
+# Mall Content OS Web v0.1.7.0
 
 本版为 **Argumentation Calibration**。
 
@@ -19,3 +19,16 @@
 ## v0.1.6.2 Runtime Performance
 
 见 `RUNTIME_PERFORMANCE_v0.1.6.2.md`。本版本不修改 Rules 或 Gate。
+
+
+## v0.1.7.0
+
+- 新增 `S007｜论证推进与功能增量`（MAJOR），用于识别同义重复、同质案例重复证明、未兑现铺垫与偏航式新增；允许有效归纳、必要转场与同主题持续深入。
+- 新增可选事实搜索：前端勾选“联网核验关键事实”后，后台先识别高风险客观事实，再通过 Tavily 搜索并生成核验结果；搜索结果只作为现有 Rules 的证据输入，不创造新标准。
+- 搜索失败自动降级为 NOT_RUN，不会因为“搜不到”直接判文章事实错误。
+
+Render 需要新增：
+```
+FACT_SEARCH_PROVIDER=tavily
+FACT_SEARCH_API_KEY=<你的 Tavily API Key>
+```

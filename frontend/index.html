@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <header>
-      <div class="eyebrow">Mr. Mall CONTENT OS · REVIEW CORE v0.1.6.1</div>
+      <div class="eyebrow">Mr. Mall CONTENT OS · REVIEW CORE v0.1.7.0</div>
       <h1>Mall先生 文章质量评估系统</h1>
     </header>
 
@@ -35,6 +35,7 @@
       <label>待审核文章
         <textarea id="article" placeholder="把完整文章粘贴到这里……"></textarea>
       </label>
+      <label class="checkline"><input id="verifyFacts" type="checkbox" /> 联网核验关键事实（会增加审核时间）</label>
       <div class="actions">
         <button id="reviewBtn">开始审核</button>
         <span id="status"></span>
@@ -60,6 +61,11 @@
 
       <h3>问题清单</h3>
       <div id="issues"></div>
+
+      <div id="verificationWrap" class="hidden">
+        <h3>事实核验</h3>
+        <div id="verificationResults"></div>
+      </div>
 
       <h3>值得保留</h3>
       <ul id="strengths"></ul>

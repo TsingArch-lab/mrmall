@@ -13,9 +13,10 @@ class VerificationContext:
         if self.state not in VALID_VERIFICATION_STATES:
             raise ValueError(f"Invalid verification state: {self.state}")
 
-def make_verification_context(verify_facts: bool, results=None) -> VerificationContext:
+def make_verification_context(verify_facts: bool, results=None, state: str | None = None) -> VerificationContext:
     results = results or []
-    return VerificationContext("PARTIAL" if verify_facts else "NOT_RUN", results)
+    resolved_state = state or ("PARTIAL" if verify_facts else "NOT_RUN")
+    return VerificationContext(resolved_state, results)
 
 def verification_guard_text(ctx: VerificationContext) -> str:
     return f"""FACT_VERIFICATION_STATE: {ctx.state}
@@ -28,7 +29,7 @@ def verification_guard_text(ctx: VerificationContext) -> str:
 6. 不得为了谨慎把未知状态转为 FAIL。"""
 
 def fail_is_only_unverified(rule_id: str, explanation: str, ctx: VerificationContext) -> bool:
-    if ctx.state != "NOT_RUN" or rule_id not in FACT_SENSITIVE_RULE_IDS:
+    if rule_id not in FACT_SENSITIVE_RULE_IDS:
         return False
     t=(explanation or "").lower()
     unknown=["无法核实","无法核验","未核实","未核验","没有来源","缺乏来源","未提供来源","未提供出处","无出处","不可追溯","无法追溯","cannot verify","unverified","no source"]

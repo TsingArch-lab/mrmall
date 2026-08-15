@@ -1,4 +1,4 @@
-# 事实核验搜索层规范 v0.3c
+# 事实核验搜索层规范 v0.4
 
 ## 目标
 
@@ -170,6 +170,10 @@ verification_results:
     source_level: primary | authoritative_secondary | secondary | none
     evidence: "..."
     notes: "..."
+    sources:
+      - title: "..."
+        url: "https://..."
+        snippet: "..."
 ```
 
 ---
@@ -251,3 +255,14 @@ verification_results:
 - “某专家指出，家庭消费是世界级商圈的必要条件”
 
 事实核验层才负责搜索并核验其外部归属与原意。
+
+
+## 十、Web v0.1.7.0 执行实现
+
+网络平台中的事实核验采用可选开关：
+1. 先由模型只从文章中抽取高优先级客观事实，最多 `FACT_SEARCH_MAX_CLAIMS` 条；
+2. 使用 Tavily Search API 并发搜索；
+3. 再由模型仅依据搜索结果进行五级核验分类；
+4. 将结果写入 `VERIFICATION_RESULTS`，再交由既有 Rules 判断。
+
+事实搜索失败、未配置 Key、或某条事实未被覆盖时，不得据此自动判错。

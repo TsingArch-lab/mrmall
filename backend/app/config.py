@@ -35,6 +35,15 @@ class Settings:
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")
     app_access_token: str = os.getenv("APP_ACCESS_TOKEN", "")
     max_article_chars: int = int(os.getenv("MAX_ARTICLE_CHARS", "50000"))
+    # Optional external fact search. Search runs only when the author enables it in the UI.
+    fact_search_provider: str = os.getenv("FACT_SEARCH_PROVIDER", "tavily")
+    fact_search_api_key: str = os.getenv("FACT_SEARCH_API_KEY", os.getenv("TAVILY_API_KEY", ""))
+    fact_search_max_claims: int = int(os.getenv("FACT_SEARCH_MAX_CLAIMS", "8"))
+    fact_search_max_results: int = int(os.getenv("FACT_SEARCH_MAX_RESULTS", "5"))
+    fact_search_concurrency: int = int(os.getenv("FACT_SEARCH_CONCURRENCY", "4"))
+    fact_search_depth: str = os.getenv("FACT_SEARCH_DEPTH", "basic")
+    fact_search_timeout_seconds: float = float(os.getenv("FACT_SEARCH_TIMEOUT_SECONDS", "20"))
+    fact_verifier_timeout_seconds: float = float(os.getenv("FACT_VERIFIER_TIMEOUT_SECONDS", "60"))
 
 
 settings = Settings()

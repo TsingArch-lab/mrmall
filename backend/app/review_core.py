@@ -17,6 +17,7 @@ from .contracts import (
 )
 from .llm import LLMError, get_provider
 from .verification import make_verification_context, verification_guard_text
+from .fact_search import verify_article_facts
 from .feedback_clustering import cluster_failed_rules
 
 logger = logging.getLogger("mall_content_os.review")
@@ -572,12 +573,31 @@ async def review_article(
         )
 
     verification_results: list[dict[str, Any]] = []
-    verification_context = make_verification_context(verify_facts, verification_results)
-    verification_note = (
-        "Web v0.1.3 尚未接入外部事实检索插件；verification_state=PARTIAL，未覆盖事实不会自动判错。"
-        if verify_facts else
-        "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
-    )
+    verification_state = "NOT_RUN"
+    verification_note = "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
+
+    if verify_facts:
+        _emit_progress(progress_callback, "FACT_CHECKING", "正在联网核验关键事实")
+        t0 = time.perf_counter()
+        logger.info("[review] fact_search start")
+        try:
+            fact_outcome = await verify_article_facts(article, content_type)
+            verification_results = fact_outcome.results
+            verification_state = fact_outcome.state
+            verification_note = fact_outcome.note
+            logger.info(
+                "[review] fact_search done elapsed=%.2fs state=%s results=%d",
+                time.perf_counter() - t0,
+                verification_state,
+                len(verification_results),
+            )
+        except Exception as exc:
+            logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t0, exc)
+            verification_state = "NOT_RUN"
+            verification_results = []
+            verification_note = "事实搜索发生异常，本次审核已自动降级为未联网核验；不会因为搜索失败判文章事实错误。"
+
+    verification_context = make_verification_context(verify_facts, verification_results, state=verification_state)
 
     _emit_progress(progress_callback, "EVALUATING", "正在执行规则审核")
     t0 = time.perf_counter()
@@ -696,6 +716,8 @@ async def review_article(
         "model": settings.llm_model or "mock",
         "registry_hash": registry_hash(),
         "verification_note": verification_note,
+        "verification_state": verification_context.state,
+        "verification_results": verification_context.results,
     }
 
     _emit_progress(progress_callback, "COMPLETED", "审核完成")

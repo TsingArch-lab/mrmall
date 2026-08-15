@@ -1,4 +1,4 @@
-const APP_VERSION='0.1.6.2';
+const APP_VERSION='0.1.7.0';
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
 apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
@@ -17,14 +17,14 @@ $('reviewBtn').addEventListener('click', async () => {
   const headers=Object.assign({'Content-Type':'application/json'}, tokenInput.value.trim() ? {'Authorization':'Bearer '+tokenInput.value.trim()} : {});
   const stageText={
     QUEUED:'正在排队', STARTING:'正在准备审核', ROUTING:'正在判断文章类型',
-    EVALUATING:'正在执行规则审核', ADJUDICATING:'正在复核未决规则',
+    FACT_CHECKING:'正在联网核验关键事实', EVALUATING:'正在执行规则审核', ADJUDICATING:'正在复核未决规则',
     AGGREGATING:'正在汇总规则结果', POSTPROCESSING:'正在整理问题清单与值得保留',
     COMPLETED:'审核完成', FAILED:'审核失败'
   };
   try {
     const createResp=await fetch(base + '/api/review/jobs', {
       method:'POST', headers,
-      body:JSON.stringify({article, content_type:$('contentType').value, verify_facts:false})
+      body:JSON.stringify({article, content_type:$('contentType').value, verify_facts:$('verifyFacts').checked})
     });
     const created=await createResp.json();
     if(!createResp.ok) throw new Error(created && created.detail ? created.detail : ('HTTP '+createResp.status+' 创建审核任务失败'));
@@ -63,6 +63,7 @@ function render(d){
   $('dimensions').innerHTML = Object.entries(d.dimension_states).map(([k,v])=>`<div class="dim"><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   if(d.core_diagnosis){$('diagnosisWrap').classList.remove('hidden');$('diagnosis').textContent=d.core_diagnosis}else{$('diagnosisWrap').classList.add('hidden')}
   $('issues').innerHTML = d.issues.length ? d.issues.map((x,i)=>`<div class="issue"><strong>${i+1}. ${esc(x.text)}</strong><div class="rule">Rule: ${esc((x.supporting_rule_ids||[]).join(', '))}</div>${(x.article_evidence||[]).map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('')}</div>`).join('') : '<p>当前 Rules 未生成负面问题。</p>';
+  renderVerification(d);
   const strengthHtml=(d.strengths||[]).map(x=>{
     if(typeof x === 'string') return x.trim() ? `<li>${esc(x)}</li>` : '';
     if(!x || typeof x !== 'object') return '';
@@ -78,3 +79,22 @@ function render(d){
   $('result').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function renderVerification(d){
+  const wrap=$('verificationWrap');
+  const box=$('verificationResults');
+  const rows=Array.isArray(d.verification_results)?d.verification_results:[];
+  if((d.verification_state||'NOT_RUN')==='NOT_RUN' && !rows.length){wrap.classList.add('hidden');box.innerHTML='';return;}
+  wrap.classList.remove('hidden');
+  const labels={confirmed:'已确认',basically_confirmed:'基本确认',questionable:'存疑',no_reliable_source:'未找到可靠依据',contradicted:'明确不符'};
+  box.innerHTML=rows.length?rows.map((x,i)=>{
+    const status=labels[x.status]||x.status||'未分类';
+    const srcs=(Array.isArray(x.sources)?x.sources:[]).map(s=>{
+      const url=safeUrl(s.url); const title=String(s.title||url||'来源');
+      return url?`<a class="source-link" href="${attr(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>`:'';
+    }).filter(Boolean).join(' · ');
+    return `<div class="verify-item"><strong>${i+1}. ${esc(status)}｜${esc(x.claim||'')}</strong><div class="evidence">${esc(x.evidence||'')}</div>${x.notes?`<div class="rule">${esc(x.notes)}</div>`:''}${srcs?`<div class="sources">${srcs}</div>`:''}</div>`;
+  }).join(''):'<p>已执行事实扫描，但没有需要优先展示的核验结果。</p>';
+}
+function attr(v){return esc(v).replace(/`/g,'&#96;')}
+function safeUrl(v){try{const u=new URL(String(v||''));return (u.protocol==='http:'||u.protocol==='https:')?u.href:''}catch{return ''}}

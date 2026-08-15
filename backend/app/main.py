@@ -15,12 +15,13 @@ load_dotenv()
 from .config import settings
 from .llm import LLMError
 from .models import ReviewRequest, ReviewResponse
+from .fact_search import fact_search_available
 from .review_core import registry_hash, review_article
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mall_content_os.api")
 
-app = FastAPI(title="Mall Content OS Review API", version="0.1.6.2")
+app = FastAPI(title="Mall Content OS Review API", version="0.1.7.0")
 
 origins = (
     ["*"]
@@ -65,11 +66,13 @@ def health():
     return {
         "ok": True,
         "service": "mall-content-os-review",
-        "version": "0.1.6.2",
+        "version": "0.1.7.0",
         "registry_hash": registry_hash(),
         "provider": settings.llm_provider,
         "model": settings.llm_model or "mock",
         "secondary_model": settings.llm_model_secondary or settings.llm_model or "mock",
+        "fact_search_provider": settings.fact_search_provider,
+        "fact_search_available": fact_search_available(),
     }
 
 

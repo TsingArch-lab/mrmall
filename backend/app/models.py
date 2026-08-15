@@ -20,3 +20,5 @@ class ReviewResponse(BaseModel):
     unresolved_rules:list[dict[str,Any]]; failed_rule_ids:list[str]
     model_provider:str; model:str; registry_hash:str
     verification_note:str|None=None
+    verification_state:str|None=None
+    verification_results:list[dict[str,Any]]=Field(default_factory=list)
