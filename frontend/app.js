@@ -1,4 +1,4 @@
-const APP_VERSION='0.1.7.0';
+const APP_VERSION='0.1.7.2';
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
 apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
@@ -87,14 +87,20 @@ function renderVerification(d){
   if((d.verification_state||'NOT_RUN')==='NOT_RUN' && !rows.length){wrap.classList.add('hidden');box.innerHTML='';return;}
   wrap.classList.remove('hidden');
   const labels={confirmed:'已确认',basically_confirmed:'基本确认',questionable:'存疑',no_reliable_source:'未找到可靠依据',contradicted:'明确不符'};
-  box.innerHTML=rows.length?rows.map((x,i)=>{
+  if(!rows.length){box.innerHTML='<p>已执行事实扫描，但没有需要优先展示的核验结果。</p>';return;}
+  const body=rows.map((x,i)=>{
     const status=labels[x.status]||x.status||'未分类';
+    const riskLabels={anchor:'基础锚点',named_story:'具名故事',quote:'人物引语',authority_attribution:'权威归属',operating_metric:'经营数据',extreme_claim:'极值表述',other:'其他'};
+    const risk=riskLabels[x.risk_tag]||'';
+    const warn=x.authority_warning ? '<div class="authority-warning">高风险：权威来源引用存疑/错误</div>' : '';
     const srcs=(Array.isArray(x.sources)?x.sources:[]).map(s=>{
       const url=safeUrl(s.url); const title=String(s.title||url||'来源');
       return url?`<a class="source-link" href="${attr(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>`:'';
-    }).filter(Boolean).join(' · ');
-    return `<div class="verify-item"><strong>${i+1}. ${esc(status)}｜${esc(x.claim||'')}</strong><div class="evidence">${esc(x.evidence||'')}</div>${x.notes?`<div class="rule">${esc(x.notes)}</div>`:''}${srcs?`<div class="sources">${srcs}</div>`:''}</div>`;
-  }).join(''):'<p>已执行事实扫描，但没有需要优先展示的核验结果。</p>';
+    }).filter(Boolean).join('<br>');
+    const note=[x.evidence,x.notes].filter(Boolean).map(esc).join('<br>');
+    return `<tr class="${x.authority_warning?'verify-row-warning':''}"><td class="verify-index">${i+1}</td><td class="verify-status">${esc(status)}${risk?`<div class="verify-risk">${esc(risk)}</div>`:''}${warn}</td><td>${esc(x.claim||'')}</td><td>${note||'—'}</td><td class="verify-sources">${srcs||'—'}</td></tr>`;
+  }).join('');
+  box.innerHTML=`<div class="verify-table-wrap"><table class="verify-table"><thead><tr><th>#</th><th>结果</th><th>原文事实</th><th>核验说明</th><th>来源</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 function attr(v){return esc(v).replace(/`/g,'&#96;')}
 function safeUrl(v){try{const u=new URL(String(v||''));return (u.protocol==='http:'||u.protocol==='https:')?u.href:''}catch{return ''}}

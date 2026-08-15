@@ -1,4 +1,4 @@
-# Mall Content OS Web v0.1.7.0
+# Mall Content OS Web v0.1.7.2
 
 本版为 **Argumentation Calibration**。
 
@@ -20,6 +20,13 @@
 
 见 `RUNTIME_PERFORMANCE_v0.1.6.2.md`。本版本不修改 Rules 或 Gate。
 
+
+## v0.1.7.2
+
+- 事实核验表格移动到“值得保留”之后。
+- Fact Search 与主 Rule Evaluator 并行。
+- 搜索上限仍为 8 条。
+- Rules / Gate 不变。
 
 ## v0.1.7.0
 

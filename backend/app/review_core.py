@@ -16,7 +16,7 @@ from .contracts import (
     normalize_rule_evaluation,
 )
 from .llm import LLMError, get_provider
-from .verification import make_verification_context, verification_guard_text
+from .verification import FACT_SENSITIVE_RULE_IDS, make_verification_context, verification_guard_text
 from .fact_search import verify_article_facts
 from .feedback_clustering import cluster_failed_rules
 
@@ -239,6 +239,79 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
                 f"Rule Evaluator 输出未通过契约校验：{exc}. "
                 "为防止错误审稿，本次结果已中止。"
             ) from first_exc
+
+
+async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
+    """Evaluate only an explicit subset of already-applicable Rules.
+
+    Used by the fact-check performance path after the main evaluator has run in
+    parallel with web search. It cannot introduce new Rules.
+    """
+    applicable = set(applicable_rule_ids(content_type))
+    supplied_ids = [rid for rid in rule_ids if rid in applicable]
+    if not supplied_ids:
+        return None
+    reg = rules_by_id()
+    keys = [
+        "rule_id", "name", "stage", "severity", "evaluation_question",
+        "pass_condition", "fail_condition", "exceptions",
+    ]
+    rules = [{k: reg[rid].get(k) for k in keys} for rid in supplied_ids]
+    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+    user = _render(
+        evaluator,
+        {
+            "CONTENT_TYPE": content_type,
+            "APPLICABLE_RULES_COMPACT": rules,
+            "VERIFICATION_RESULTS": verification_context.results,
+            "VERIFICATION_GUARD": verification_guard_text(verification_context),
+            "ARTICLE": article,
+        },
+    )
+    provider = get_provider()
+    raw = await provider.generate_json(
+        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的事实敏感 Rules，不得重审其他规则。",
+        user,
+    )
+    return normalize_rule_evaluation(
+        raw,
+        content_type=content_type,
+        supplied_rule_ids=supplied_ids,
+        verification_context=verification_context,
+    )
+
+
+def merge_rule_subset(eval_result: dict[str, Any], subset_result: dict[str, Any] | None, rule_ids: list[str]):
+    """Replace statuses for the selected Rule IDs while preserving all others."""
+    if not subset_result:
+        return eval_result
+    targets = set(rule_ids)
+    eval_result["passed_rule_ids"] = [x for x in eval_result.get("passed_rule_ids", []) if x not in targets]
+    eval_result["na_rule_ids"] = [x for x in eval_result.get("na_rule_ids", []) if x not in targets]
+    eval_result["failed_rules"] = [x for x in eval_result.get("failed_rules", []) if x.get("rule_id") not in targets]
+    eval_result["unresolved_rules"] = [x for x in eval_result.get("unresolved_rules", []) if x.get("rule_id") not in targets]
+    eval_result["passed_rule_ids"] += subset_result.get("passed_rule_ids", [])
+    eval_result["na_rule_ids"] += subset_result.get("na_rule_ids", [])
+    eval_result["failed_rules"] += subset_result.get("failed_rules", [])
+    eval_result["unresolved_rules"] += subset_result.get("unresolved_rules", [])
+    eval_result["evaluated_rule_ids"] = list(applicable_rule_ids(eval_result["content_type"]))
+    return eval_result
+
+
+def verification_requires_rule_recheck(results: list[dict[str, Any]]) -> bool:
+    """Only material adverse search findings justify an extra evaluator call.
+
+    Confirmed/basic/no-source findings do not need to delay the review. A high-
+    importance questionable claim or any contradiction can materially affect G001/G002.
+    """
+    for item in results:
+        status = str(item.get("status", "")).lower()
+        importance = str(item.get("importance", "medium")).lower()
+        if status == "contradicted":
+            return True
+        if status == "questionable" and importance == "high":
+            return True
+    return False
 
 
 async def adjudicate_unresolved(
@@ -576,47 +649,92 @@ async def review_article(
     verification_state = "NOT_RUN"
     verification_note = "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
 
-    if verify_facts:
-        _emit_progress(progress_callback, "FACT_CHECKING", "正在联网核验关键事实")
-        t0 = time.perf_counter()
+    # Performance path: fact search and the main Rule Evaluator run concurrently.
+    # The main evaluator uses NOT_RUN verification, so it cannot punish unknown facts.
+    # After search finishes, only the existing fact-sensitive Rules (G001/G002) are
+    # selectively rechecked when search finds a material adverse signal.
+    preliminary_verification_context = make_verification_context(False, [], state="NOT_RUN")
+
+    _emit_progress(
+        progress_callback,
+        "FACT_CHECKING" if verify_facts else "EVALUATING",
+        "正在并行执行规则审核与事实核验" if verify_facts else "正在执行规则审核",
+    )
+    parallel_started = time.perf_counter()
+    logger.info("[review] parallel_core start verify_facts=%s content_type=%s", verify_facts, content_type)
+
+    async def _main_evaluator_task():
+        t = time.perf_counter()
+        logger.info("[review] evaluate_rules start content_type=%s verification=NOT_RUN", content_type)
+        try:
+            value = await asyncio.wait_for(
+                evaluate_rules(article, content_type, preliminary_verification_context),
+                timeout=settings.llm_evaluator_stage_timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise LLMError(
+                f"Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
+            ) from exc
+        logger.info(
+            "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d",
+            time.perf_counter() - t,
+            len(value.get("failed_rules", [])),
+            len(value.get("unresolved_rules", [])),
+        )
+        return value
+
+    async def _fact_search_task():
+        if not verify_facts:
+            return None
+        t = time.perf_counter()
         logger.info("[review] fact_search start")
         try:
-            fact_outcome = await verify_article_facts(article, content_type)
+            value = await verify_article_facts(article, content_type)
+            logger.info(
+                "[review] fact_search done elapsed=%.2fs state=%s results=%d",
+                time.perf_counter() - t,
+                value.state,
+                len(value.results),
+            )
+            return value
+        except Exception as exc:
+            logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            return None
+
+    eval_result, fact_outcome = await asyncio.gather(_main_evaluator_task(), _fact_search_task())
+    logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
+
+    if verify_facts:
+        if fact_outcome is not None:
             verification_results = fact_outcome.results
             verification_state = fact_outcome.state
             verification_note = fact_outcome.note
-            logger.info(
-                "[review] fact_search done elapsed=%.2fs state=%s results=%d",
-                time.perf_counter() - t0,
-                verification_state,
-                len(verification_results),
-            )
-        except Exception as exc:
-            logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t0, exc)
+        else:
             verification_state = "NOT_RUN"
             verification_results = []
             verification_note = "事实搜索发生异常，本次审核已自动降级为未联网核验；不会因为搜索失败判文章事实错误。"
 
     verification_context = make_verification_context(verify_facts, verification_results, state=verification_state)
+    validate_eval(eval_result, content_type)
 
-    _emit_progress(progress_callback, "EVALUATING", "正在执行规则审核")
-    t0 = time.perf_counter()
-    logger.info("[review] evaluate_rules start content_type=%s", content_type)
-    try:
-        eval_result = await asyncio.wait_for(
-            evaluate_rules(article, content_type, verification_context),
-            timeout=settings.llm_evaluator_stage_timeout_seconds,
-        )
-    except asyncio.TimeoutError as exc:
-        raise LLMError(
-            f"Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
-        ) from exc
-    logger.info(
-        "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d",
-        time.perf_counter() - t0,
-        len(eval_result.get("failed_rules", [])),
-        len(eval_result.get("unresolved_rules", [])),
-    )
+    # Only adverse, high-impact search findings trigger a small targeted recheck.
+    fact_rule_ids = [rid for rid in FACT_SENSITIVE_RULE_IDS if rid in applicable_rule_ids(content_type)]
+    if verify_facts and fact_rule_ids and verification_requires_rule_recheck(verification_results):
+        _emit_progress(progress_callback, "ADJUDICATING", "正在复核事实敏感规则")
+        t0 = time.perf_counter()
+        logger.info("[review] fact_sensitive_recheck start rules=%s", fact_rule_ids)
+        try:
+            subset = await asyncio.wait_for(
+                evaluate_rule_subset(article, content_type, verification_context, fact_rule_ids),
+                timeout=settings.llm_adjudicator_stage_timeout_seconds,
+            )
+            eval_result = merge_rule_subset(eval_result, subset, fact_rule_ids)
+            logger.info("[review] fact_sensitive_recheck done elapsed=%.2fs", time.perf_counter() - t0)
+        except Exception as exc:
+            logger.warning("[review] fact_sensitive_recheck degraded elapsed=%.2fs error=%s", time.perf_counter() - t0, exc)
+    elif verify_facts:
+        logger.info("[review] fact_sensitive_recheck skipped: no material adverse verification signal")
+
     validate_eval(eval_result, content_type)
 
     if eval_result.get("unresolved_rules", []):
