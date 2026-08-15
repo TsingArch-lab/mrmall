@@ -105,7 +105,12 @@ def _safe_debug_response(text: str) -> None:
 
 
 class Provider:
-    async def generate_json(self, system: str, user: str) -> dict[str, Any]:
+    async def generate_json(
+        self,
+        system: str,
+        user: str,
+        reasoning_effort: str | None = None,
+    ) -> dict[str, Any]:
         raise NotImplementedError
 
 
@@ -116,7 +121,13 @@ class OpenAICompatibleProvider(Provider):
         self.model = (model_override or settings.llm_model).strip()
         self.timeout_seconds = timeout_override or settings.llm_timeout_seconds
 
-    async def _request(self, system: str, user: str, use_json_mode: bool = True) -> str:
+    async def _request(
+        self,
+        system: str,
+        user: str,
+        use_json_mode: bool = True,
+        reasoning_effort: str | None = None,
+    ) -> str:
         if not settings.llm_api_key:
             raise LLMError("LLM_API_KEY is missing")
         if not self.model:
@@ -135,6 +146,11 @@ class OpenAICompatibleProvider(Provider):
             ],
             "temperature": 0,
         }
+        if reasoning_effort:
+            # Explicitly enable DeepSeek thinking and raise the reasoning budget only
+            # for call sites that opt in (the formal Rule Evaluator).
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = reasoning_effort
         if use_json_mode:
             payload["response_format"] = {"type": "json_object"}
 
@@ -176,8 +192,18 @@ class OpenAICompatibleProvider(Provider):
 
         raise LLMError(f"Provider request failed: {last_error}")
 
-    async def generate_json(self, system: str, user: str) -> dict[str, Any]:
-        text = await self._request(system, user, True)
+    async def generate_json(
+        self,
+        system: str,
+        user: str,
+        reasoning_effort: str | None = None,
+    ) -> dict[str, Any]:
+        text = await self._request(
+            system,
+            user,
+            True,
+            reasoning_effort=reasoning_effort,
+        )
         try:
             return _extract_json(text)
         except Exception:
@@ -195,7 +221,12 @@ class OpenAICompatibleProvider(Provider):
 
 
 class MockProvider(Provider):
-    async def generate_json(self, system: str, user: str) -> dict[str, Any]:
+    async def generate_json(
+        self,
+        system: str,
+        user: str,
+        reasoning_effort: str | None = None,
+    ) -> dict[str, Any]:
         if "CONTENT_TYPE_ROUTER" in system or "CONTENT_TYPE_ROUTER" in user:
             return {
                 "content_type": "D",
