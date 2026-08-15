@@ -26,18 +26,12 @@ class Settings:
     llm_model_secondary: str = os.getenv("LLM_MODEL_SECONDARY", "")
     llm_secondary_timeout_seconds: float = float(os.getenv("LLM_SECONDARY_TIMEOUT_SECONDS", "90"))
     llm_evaluator_stage_timeout_seconds: float = float(os.getenv("LLM_EVALUATOR_STAGE_TIMEOUT_SECONDS", "240"))
-    # Per Rule Test Batch timeout. Batches run concurrently; this does not add serial depth.
-    rule_test_batch_timeout_seconds: float = float(os.getenv("RULE_TEST_BATCH_TIMEOUT_SECONDS", "180"))
-    rule_test_trace_max_chars: int = int(os.getenv("RULE_TEST_TRACE_MAX_CHARS", "6000"))
     llm_router_stage_timeout_seconds: float = float(os.getenv("LLM_ROUTER_STAGE_TIMEOUT_SECONDS", "90"))
     llm_adjudicator_stage_timeout_seconds: float = float(os.getenv("LLM_ADJUDICATOR_STAGE_TIMEOUT_SECONDS", "90"))
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     llm_http_retries: int = int(os.getenv("LLM_HTTP_RETRIES", "2"))
     llm_debug_raw_response: bool = _bool_env("LLM_DEBUG_RAW_RESPONSE", False)
     llm_debug_max_chars: int = int(os.getenv("LLM_DEBUG_MAX_CHARS", "1200"))
-    # Shared Article Representation Layer. Descriptive only; it never creates Rule/Gate criteria.
-    article_map_timeout_seconds: float = float(os.getenv("ARTICLE_MAP_TIMEOUT_SECONDS", "70"))
-    article_map_max_units: int = int(os.getenv("ARTICLE_MAP_MAX_UNITS", "40"))
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")
     app_access_token: str = os.getenv("APP_ACCESS_TOKEN", "")
     max_article_chars: int = int(os.getenv("MAX_ARTICLE_CHARS", "50000"))

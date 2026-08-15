@@ -7,13 +7,16 @@
 - CONTENT_TYPE
 - APPLICABLE_RULES_COMPACT
 - VERIFICATION_RESULTS（可选）
-- EVALUATION_MODE（DIRECT_TEXT / MAP_AWARE）
-- TEST_BATCH_NAME（执行分组名；仅用于执行，不是 Rule）
-- TEST_PLAN（由 supplied Rules 派生出的检查动作；不得增加评价标准）
-- ARTICLE_MAP（MAP_AWARE 时提供；DIRECT_TEXT 时仅为 NOT_USED 标记）
 
 ## 唯一任务
-逐条判断输入中提供的 Rule。不得评价未提供的标准。
+逐条、独立判断输入中提供的 Rule。不得评价未提供的标准。
+
+## 通用执行纪律
+- 每条 Rule 都必须依据它自己的 `evaluation_question`、`pass_condition`、`fail_condition` 与 `exceptions` 独立判断；不得先形成“这篇文章总体不错/总体完整”的印象，再把该印象复制到多条 Rule。
+- PASS 不是默认值。对每条 Rule，必须先检查文章中是否存在明确命中该 Rule `fail_condition` 的内容，并同时检查其 `exceptions`；确认没有实质命中后才能 PASS。
+- 一条 Rule PASS，不能作为另一条 Rule PASS 的理由。文章有完整结构、有案例、有机制、有总结，也不能自动推出其他 Rule 达标。
+- 对涉及全文关系的 Rule，必须查看全文相关章节之间的关系；不得只凭某一段局部成立就判全文 PASS。对局部表达类 Rule，则只按该 Rule 要求的局部范围判断。
+- 只依据 supplied Rules 做上述检查。这些执行纪律只规定“如何忠实执行 Rule”，不增加任何新的质量标准。
 
 ## 硬约束
 1. 只评估 supplied Rule IDs。
@@ -25,50 +28,8 @@
 7. 不得新增、推导、补充任何质量标准。
 8. 事实核验缺失时，不得假装已经搜索。
 
-
-## Article Map 使用边界（强制）
-- Article Map 只是 ARTICLE 的描述性索引，不是 Rule、不是证据结论、不是质量判断。
-- ARTICLE 永远是事实与原文 evidence 的最终来源；Map 与 ARTICLE 冲突时必须以 ARTICLE 为准。
-- 不得因为 Map 使用了 `restates`、`shifts_topic` 等关系标签就自动 FAIL；只有当 ARTICLE 本身同时命中 supplied Rule 的既有 fail_condition 时才能 FAIL。
-- `MAP_AWARE` 模式下，必须利用 Map 做跨章节/跨单元比较，避免只凭“整体感觉”判断全文型 Rule。
-- `DIRECT_TEXT` 模式下，主要依据 ARTICLE 的局部文本、事实、引语、表达或明确结构位置执行 supplied Rules，不得自行补做未提供的 Rule。
-- 对结构/论证推进类 Rule，Map 可帮助定位单元关系，但最终 FAIL evidence 仍必须引用 ARTICLE 原文。
-
-### MAP_AWARE 执行方法
-在不新增标准的前提下，先用 Map 定位 supplied Rule 所需要的跨单元关系，再回到 ARTICLE 核对：
-1. TOPIC：核心问题/判断是否贯穿主要单元；
-2. EVIDENCE：核心判断依赖哪些具体材料，材料是否只是同口径重复；
-3. INSIGHT：事实→机制→判断是否真的多走了一步，判断强度是否由现有链条支撑；
-4. STRUCTURE：各主要单元的 role / relation_to_prior 是否形成 supplied Rule 所要求的闭环、递进、边界或功能增量；
-5. FINAL：最终核心判断是否能从正文主要单元中追溯出来；
-6. EXPRESSION 若偶尔进入本模式，仍以 ARTICLE 原句为主。
-
-特别是 S007：必须逐个查看保真 Argument Block 相对于前文承担的论证功能，并按该 Rule 原文执行“删除测试”和“案例边际价值测试”；Map 只负责让横向比较可见，不能替代 Rule 自己的 PASS/FAIL 条件。
-- 不得因为 Article Map 已经把每块写成一条 `main_claim/new_contribution` 就默认存在增量；要比较多个 Block 实际承担的证明功能。
-- 对连续或近邻的 `restates`、以及多个 `adds_example`，必须进一步判断它们是否只是继续证明已经充分成立的同一命题。
-- `synthesizes` 只有在首次建立新的关系/框架时才代表结构性新增；后续再次换抽象词概括同一关系，仍应按 ARTICLE 和 S007 原文判断。
-- 执行删除测试时，内部明确回答：若去掉该 Block（或连续同功能 Blocks），核心理解具体损失什么。不要把“文章仍然通顺”或“有案例/有总结”本身当作 PASS 理由。
-
-对 I005 / F003：Map 用于定位全文的强判断与其实际支撑链。遇到“所有、任何、注定、从来、唯一、90%”等强确定性表达时，不因文章整体案例丰富而自动 PASS；仍只按 supplied Rule 的既有确定性/克制度条件执行。
-
-
-## Rule Test Plan（强制）
-- TEST_PLAN 只规定“如何执行 supplied Rules”，不能改变任何 Rule 的 pass/fail 条件。
-- 必须先完成 TEST_PLAN 指定的检查动作，再逐条裁决 supplied Rules；不得先形成“这篇文章总体不错/不好”的印象后批量赋值。
-- 一个 Rule 的 PASS 不能作为另一 Rule 的自动 PASS 理由。
-- 局部亮点不能自动抵消全文型 Rule 的命中，全文问题也不能自动让局部 Rule FAIL。
-- 可在标准输出字段之外附加 `test_trace` 供运行日志观察。`test_trace` 不是 Rule Result，程序会在 Gate 前丢弃；它不得创造或改变 PASS/FAIL。建议结构：
-  `{"batch_name":"...","operations_completed":["..."],"observations":[{"rule_id":"S007","signals":["B12/B13... "]}]}`
-- `test_trace.observations` 只能引用 supplied Rule IDs；没有观察信号时允许空数组。
-
-TEST_BATCH_NAME:
-{{TEST_BATCH_NAME}}
-
-TEST_PLAN:
-{{TEST_PLAN}}
-
 ## 输出
-严格符合 `rule_evaluation_schema.json`。标准 Rule Result 必须符合 `rule_evaluation_schema.json`；仅允许额外附加运行时 `test_trace`，该字段会在契约归一化前被剥离且永不进入 Gate。
+严格符合 `rule_evaluation_schema.json`。不要输出 Schema 之外的字段。
 
 必须输出一个 JSON 对象，且包含全部 6 个字段：
 `content_type`、`evaluated_rule_ids`、`passed_rule_ids`、`failed_rules`、`na_rule_ids`、`unresolved_rules`。
@@ -98,12 +59,6 @@ VERIFICATION_RESULTS:
 
 VERIFICATION_EXECUTION_GUARD:
 {{VERIFICATION_GUARD}}
-
-EVALUATION_MODE:
-{{EVALUATION_MODE}}
-
-ARTICLE_MAP:
-{{ARTICLE_MAP}}
 
 ARTICLE:
 {{ARTICLE}}

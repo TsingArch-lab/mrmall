@@ -30,14 +30,6 @@
 
 只有四问都通过，`significant_asset` 才能设为 `true`。
 
-
-## Article Map 与 FAIL 冲突保护
-- ARTICLE_MAP 只用于理解候选内容在全文中的位置与功能，不新增表扬标准。
-- FAILED_RULES_GUARD 只用于防止正向反馈与已确定 FAIL 发生语义冲突。
-- 如果某个局部段落确实有保护价值，可以保留；但不得把局部优点夸大成已被 FAIL Rule 否定的全文属性。
-- 例如 S007 已 FAIL 时，可以保留一个具体、有效的机制段落，但不得表扬“全文层层递进、每段都有增量”；I005 已 FAIL 时，不得把过满的判断表扬为“结论有力度且证据充分”。
-- 所有 Strength 仍必须只绑定 PASSED_STRENGTH_RULES；FAILED_RULES_GUARD 不能生成新的负面反馈。
-
 ## 输出契约
 
 只输出一个 JSON 对象：
@@ -64,12 +56,6 @@ CONTENT_TYPE:
 
 PASSED_STRENGTH_RULES:
 {{PASSED_STRENGTH_RULES}}
-
-FAILED_RULES_GUARD:
-{{FAILED_RULES_GUARD}}
-
-ARTICLE_MAP:
-{{ARTICLE_MAP}}
 
 ARTICLE:
 {{ARTICLE}}

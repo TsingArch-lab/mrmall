@@ -196,26 +196,6 @@ class OpenAICompatibleProvider(Provider):
 
 class MockProvider(Provider):
     async def generate_json(self, system: str, user: str) -> dict[str, Any]:
-        if "ARTICLE_MAP_BUILDER" in system or "ARTICLE_MAP_BUILDER" in user:
-            article_match = re.search(r"ARTICLE:\n(.+)", user, re.S)
-            article = article_match.group(1).strip() if article_match else ""
-            quote = article[:80].strip()
-            return {
-                "core_question": "MOCK：文章主要任务",
-                "thesis": "MOCK：文章核心判断",
-                "units": [{
-                    "unit_id": "U01",
-                    "heading": "MOCK",
-                    "anchor_quote": quote,
-                    "role": "opening",
-                    "main_claim": "MOCK：首个论证单元",
-                    "evidence_used": [],
-                    "mechanism": "",
-                    "relation_to_prior": "opens",
-                    "new_contribution": "提出文章任务",
-                }] if quote else [],
-                "fact_claims": [],
-            }
         if "CONTENT_TYPE_ROUTER" in system or "CONTENT_TYPE_ROUTER" in user:
             return {
                 "content_type": "D",
@@ -232,9 +212,7 @@ class MockProvider(Provider):
                 "issue_candidates": [],
                 "strengths": ["MOCK 模式：网站链路已跑通；此结果不是实际审稿结论。"],
             }
-        rule_block = re.search(r"APPLICABLE_RULES_COMPACT:\n(.+?)\n\nVERIFICATION_RESULTS:", user, re.S)
-        source = rule_block.group(1) if rule_block else user
-        ids = re.findall(r'"rule_id"\s*:\s*"([A-Z0-9_]+)"', source)
+        ids = re.findall(r'"rule_id"\s*:\s*"([A-Z0-9_]+)"', user)
         m = re.search(r"CONTENT_TYPE:\s*([A-E])", user)
         ctype = m.group(1) if m else "D"
         return {
