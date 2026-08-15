@@ -133,6 +133,10 @@ class OpenAICompatibleProvider(Provider):
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            # DeepSeek V4 defaults to thinking=enabled. For the production rule
+            # evaluator we explicitly use non-thinking mode to avoid long hidden
+            # reasoning latency. Keep temperature=0 for deterministic non-thinking output.
+            "thinking": {"type": "disabled"},
             "temperature": 0,
         }
         if use_json_mode:
