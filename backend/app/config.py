@@ -32,6 +32,9 @@ class Settings:
     llm_http_retries: int = int(os.getenv("LLM_HTTP_RETRIES", "2"))
     llm_debug_raw_response: bool = _bool_env("LLM_DEBUG_RAW_RESPONSE", False)
     llm_debug_max_chars: int = int(os.getenv("LLM_DEBUG_MAX_CHARS", "1200"))
+    # Shared Article Representation Layer. Descriptive only; it never creates Rule/Gate criteria.
+    article_map_timeout_seconds: float = float(os.getenv("ARTICLE_MAP_TIMEOUT_SECONDS", "70"))
+    article_map_max_units: int = int(os.getenv("ARTICLE_MAP_MAX_UNITS", "18"))
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")
     app_access_token: str = os.getenv("APP_ACCESS_TOKEN", "")
     max_article_chars: int = int(os.getenv("MAX_ARTICLE_CHARS", "50000"))

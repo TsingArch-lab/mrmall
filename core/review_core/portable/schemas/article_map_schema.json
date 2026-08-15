@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArticleMap",
+  "type": "object",
+  "required": ["core_question", "thesis", "units", "fact_claims"],
+  "properties": {
+    "core_question": {"type": "string"},
+    "thesis": {"type": "string"},
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["unit_id", "heading", "anchor_quote", "role", "main_claim", "evidence_used", "mechanism", "relation_to_prior", "new_contribution"],
+        "properties": {
+          "unit_id": {"type": "string"},
+          "heading": {"type": "string"},
+          "anchor_quote": {"type": "string"},
+          "role": {"enum": ["opening", "background", "case", "evidence", "mechanism", "comparison", "inference", "summary", "transition", "conclusion", "other"]},
+          "main_claim": {"type": "string"},
+          "evidence_used": {"type": "array", "items": {"type": "string"}},
+          "mechanism": {"type": "string"},
+          "relation_to_prior": {"enum": ["opens", "adds_example", "adds_mechanism", "adds_condition", "adds_comparison", "adds_result", "synthesizes", "restates", "transitions", "shifts_topic", "other"]},
+          "new_contribution": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "fact_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "type", "risk_tag", "importance", "search_query"],
+        "properties": {
+          "claim": {"type": "string"},
+          "type": {"enum": ["data", "case", "quote"]},
+          "risk_tag": {"enum": ["anchor", "named_story", "quote", "authority_attribution", "operating_metric", "extreme_claim", "other"]},
+          "importance": {"enum": ["high", "medium"]},
+          "search_query": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

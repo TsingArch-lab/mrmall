@@ -18,6 +18,8 @@ from .contracts import (
 from .llm import LLMError, get_provider
 from .verification import FACT_SENSITIVE_RULE_IDS, make_verification_context, verification_guard_text
 from .fact_search import verify_article_facts
+from .article_map import build_article_representation, unavailable_article_map
+from .execution_plan import build_execution_plan
 from .feedback_clustering import cluster_failed_rules
 
 logger = logging.getLogger("mall_content_os.review")
@@ -90,7 +92,7 @@ def applicable_rule_ids(content_type: str):
     return final
 
 
-def compact_rules(content_type: str):
+def compact_rule_ids(rule_ids: list[str]):
     reg = rules_by_id()
     keys = [
         "rule_id",
@@ -102,7 +104,11 @@ def compact_rules(content_type: str):
         "fail_condition",
         "exceptions",
     ]
-    return [{k: reg[rid].get(k) for k in keys} for rid in applicable_rule_ids(content_type)]
+    return [{k: reg[rid].get(k) for k in keys} for rid in rule_ids if rid in reg]
+
+
+def compact_rules(content_type: str):
+    return compact_rule_ids(applicable_rule_ids(content_type))
 
 
 def validate_eval(result: dict[str, Any], content_type: str):
@@ -190,11 +196,35 @@ async def route_content_type(article: str) -> str:
             ) from exc
 
 
-async def evaluate_rules(article: str, content_type: str, verification_context):
-    provider = get_provider()
-    rules = compact_rules(content_type)
-    supplied_ids = [r["rule_id"] for r in rules]
+async def evaluate_rule_ids(
+    article: str,
+    content_type: str,
+    verification_context,
+    rule_ids: list[str],
+    *,
+    article_map: dict[str, Any] | None = None,
+    evaluation_mode: str = "DIRECT_TEXT",
+    system_role: str = "RULE_BATCH_EVALUATOR",
+):
+    """Evaluate an explicit subset of already-applicable Rules.
+
+    Article Map is execution context only. It cannot create a Rule, a FAIL, or a Gate
+    consequence that is absent from the supplied Rule set.
+    """
+    applicable = set(applicable_rule_ids(content_type))
+    supplied_ids = [rid for rid in rule_ids if rid in applicable]
+    if not supplied_ids:
+        return {
+            "content_type": content_type,
+            "evaluated_rule_ids": [],
+            "passed_rule_ids": [],
+            "failed_rules": [],
+            "na_rule_ids": [],
+            "unresolved_rules": [],
+        }
+    rules = compact_rule_ids(supplied_ids)
     evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+    map_payload = article_map if article_map else {"state": "NOT_USED", "units": []}
     user = _render(
         evaluator,
         {
@@ -202,12 +232,15 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
             "APPLICABLE_RULES_COMPACT": rules,
             "VERIFICATION_RESULTS": verification_context.results,
             "VERIFICATION_GUARD": verification_guard_text(verification_context),
+            "EVALUATION_MODE": evaluation_mode,
+            "ARTICLE_MAP": map_payload,
             "ARTICLE": article,
         },
     )
 
+    provider = get_provider()
     raw = await provider.generate_json(
-        "你是严格的 RULE_BATCH_EVALUATOR。只能执行输入 Rules，必须严格按指定 JSON 契约输出。",
+        f"你是严格的 {system_role}。只能执行输入 Rules；Article Map 仅是描述性导航，不是规则或结论。必须严格按指定 JSON 契约输出。",
         user,
     )
     try:
@@ -236,49 +269,61 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
             )
         except ContractError as exc:
             raise LLMError(
-                f"Rule Evaluator 输出未通过契约校验：{exc}. "
-                "为防止错误审稿，本次结果已中止。"
+                f"Rule Evaluator 输出未通过契约校验：{exc}. 为防止错误审稿，本次结果已中止。"
             ) from first_exc
 
 
-async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
-    """Evaluate only an explicit subset of already-applicable Rules.
+async def evaluate_rules(article: str, content_type: str, verification_context, article_map: dict[str, Any] | None = None):
+    return await evaluate_rule_ids(
+        article, content_type, verification_context, applicable_rule_ids(content_type),
+        article_map=article_map, evaluation_mode="MAP_AWARE" if article_map else "DIRECT_TEXT",
+    )
 
-    Used by the fact-check performance path after the main evaluator has run in
-    parallel with web search. It cannot introduce new Rules.
-    """
-    applicable = set(applicable_rule_ids(content_type))
-    supplied_ids = [rid for rid in rule_ids if rid in applicable]
-    if not supplied_ids:
-        return None
-    reg = rules_by_id()
-    keys = [
-        "rule_id", "name", "stage", "severity", "evaluation_question",
-        "pass_condition", "fail_condition", "exceptions",
-    ]
-    rules = [{k: reg[rid].get(k) for k in keys} for rid in supplied_ids]
-    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
-    user = _render(
-        evaluator,
-        {
-            "CONTENT_TYPE": content_type,
-            "APPLICABLE_RULES_COMPACT": rules,
-            "VERIFICATION_RESULTS": verification_context.results,
-            "VERIFICATION_GUARD": verification_guard_text(verification_context),
-            "ARTICLE": article,
-        },
+
+async def evaluate_rule_subset(
+    article: str, content_type: str, verification_context, rule_ids: list[str],
+    article_map: dict[str, Any] | None = None,
+):
+    return await evaluate_rule_ids(
+        article, content_type, verification_context, rule_ids,
+        article_map=article_map,
+        evaluation_mode="MAP_AWARE" if article_map else "DIRECT_TEXT",
+        system_role="FACT_SENSITIVE_RULE_ADJUDICATOR",
     )
-    provider = get_provider()
-    raw = await provider.generate_json(
-        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的事实敏感 Rules，不得重审其他规则。",
-        user,
-    )
-    return normalize_rule_evaluation(
-        raw,
-        content_type=content_type,
-        supplied_rule_ids=supplied_ids,
-        verification_context=verification_context,
-    )
+
+
+def merge_disjoint_rule_evaluations(parts: list[dict[str, Any]], content_type: str) -> dict[str, Any]:
+    """Merge disjoint execution paths and verify exact Rule coverage."""
+    merged = {
+        "content_type": content_type,
+        "evaluated_rule_ids": [],
+        "passed_rule_ids": [],
+        "failed_rules": [],
+        "na_rule_ids": [],
+        "unresolved_rules": [],
+    }
+    seen: set[str] = set()
+    for part in parts:
+        if not part:
+            continue
+        ids = list(part.get("evaluated_rule_ids", []))
+        overlap = seen.intersection(ids)
+        if overlap:
+            raise ValueError(f"Rule execution plan evaluated duplicate IDs: {sorted(overlap)}")
+        seen.update(ids)
+        merged["evaluated_rule_ids"] += ids
+        merged["passed_rule_ids"] += part.get("passed_rule_ids", [])
+        merged["failed_rules"] += part.get("failed_rules", [])
+        merged["na_rule_ids"] += part.get("na_rule_ids", [])
+        merged["unresolved_rules"] += part.get("unresolved_rules", [])
+    expected = set(applicable_rule_ids(content_type))
+    if seen != expected:
+        missing = sorted(expected - seen)
+        extra = sorted(seen - expected)
+        raise ValueError(f"Rule execution coverage mismatch missing={missing} extra={extra}")
+    # Preserve deterministic canonical Rule order in evaluated_rule_ids.
+    merged["evaluated_rule_ids"] = applicable_rule_ids(content_type)
+    return merged
 
 
 def merge_rule_subset(eval_result: dict[str, Any], subset_result: dict[str, Any] | None, rule_ids: list[str]):
@@ -315,47 +360,22 @@ def verification_requires_rule_recheck(results: list[dict[str, Any]]) -> bool:
 
 
 async def adjudicate_unresolved(
-    article: str, content_type: str, eval_result: dict[str, Any], verification_context
+    article: str, content_type: str, eval_result: dict[str, Any], verification_context,
+    article_map: dict[str, Any] | None = None,
 ):
     unresolved = eval_result.get("unresolved_rules", [])
     if not unresolved:
         return eval_result
 
     unresolved_ids = [x["rule_id"] for x in unresolved]
-    reg = rules_by_id()
-    keys = [
-        "rule_id",
-        "name",
-        "stage",
-        "severity",
-        "evaluation_question",
-        "pass_condition",
-        "fail_condition",
-        "exceptions",
-    ]
-    target_rules = [{k: reg[rid].get(k) for k in keys} for rid in unresolved_ids]
-    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
-    user = _render(
-        evaluator,
-        {
-            "CONTENT_TYPE": content_type,
-            "APPLICABLE_RULES_COMPACT": target_rules,
-            "VERIFICATION_RESULTS": verification_context.results,
-            "VERIFICATION_GUARD": verification_guard_text(verification_context),
-            "ARTICLE": article,
-        },
-    )
-
-    provider = get_provider()
-    raw = await provider.generate_json(
-        "你是 TARGETED_ADJUDICATOR。只复核输入的 UNRESOLVED Rules，不得重审其他规则。",
-        user,
-    )
     try:
-        result = normalize_rule_evaluation(
-            raw, content_type=content_type, supplied_rule_ids=unresolved_ids, verification_context=verification_context
+        result = await evaluate_rule_ids(
+            article, content_type, verification_context, unresolved_ids,
+            article_map=article_map,
+            evaluation_mode="MAP_AWARE" if article_map and article_map.get("state") == "READY" else "DIRECT_TEXT",
+            system_role="TARGETED_ADJUDICATOR",
         )
-    except ContractError:
+    except (ContractError, LLMError, ValueError):
         # Adjudication is optional. Fail-safe means preserve unresolved, not fail the review.
         return eval_result
 
@@ -492,6 +512,7 @@ async def extract_strengths(
     article: str,
     content_type: str,
     eval_result: dict[str, Any],
+    article_map: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Extract positive author feedback from selected PASS Rules only.
 
@@ -517,6 +538,8 @@ async def extract_strengths(
         {
             "CONTENT_TYPE": content_type,
             "PASSED_STRENGTH_RULES": strength_rules,
+            "FAILED_RULES_GUARD": eval_result.get("failed_rules", []),
+            "ARTICLE_MAP": article_map or {"state": "NOT_RUN", "units": []},
             "ARTICLE": article,
         },
     )
@@ -626,10 +649,30 @@ async def review_article(
         verify_facts,
     )
 
-    _emit_progress(progress_callback, "STARTING", "正在准备审核")
+    _emit_progress(progress_callback, "STARTING", "正在准备审核并建立文章结构图")
+
+    # Representation starts immediately. When AUTO routing is needed, Router and Article
+    # Map run in parallel. The map is descriptive infrastructure only; a map failure must
+    # never create a FAIL or change Gate behaviour.
+    async def _representation_task():
+        t = time.perf_counter()
+        logger.info("[review] article_map start include_fact_claims=%s", verify_facts)
+        try:
+            value = await build_article_representation(article, verify_facts)
+            logger.info(
+                "[review] article_map done elapsed=%.2fs state=%s units=%d fact_claims=%d",
+                time.perf_counter() - t, value.state,
+                len(value.article_map.get("units", [])), len(value.fact_claims),
+            )
+            return value
+        except Exception as exc:
+            logger.warning("[review] article_map degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            return None
+
+    representation_task = asyncio.create_task(_representation_task())
 
     if content_type == "AUTO":
-        _emit_progress(progress_callback, "ROUTING", "正在判断文章类型")
+        _emit_progress(progress_callback, "ROUTING", "正在并行判断文章类型并建立文章结构图")
         t0 = time.perf_counter()
         logger.info("[review] route_content_type start")
         try:
@@ -638,6 +681,7 @@ async def review_article(
                 timeout=settings.llm_router_stage_timeout_seconds,
             )
         except asyncio.TimeoutError as exc:
+            representation_task.cancel()
             raise LLMError("自动判断文章类型超时。请手动选择 A/B/C/D/E 后重试。") from exc
         logger.info(
             "[review] route_content_type done elapsed=%.2fs resolved_type=%s",
@@ -645,41 +689,90 @@ async def review_article(
             content_type,
         )
 
+    all_ids = applicable_rule_ids(content_type)
+    plan = build_execution_plan(all_ids)
+    if set(plan.all_rule_ids) != set(all_ids) or len(plan.all_rule_ids) != len(set(plan.all_rule_ids)):
+        raise ValueError("Rule execution plan must cover every applicable Rule exactly once.")
+    logger.info(
+        "[review] execution_plan direct=%d map_aware=%d total=%d",
+        len(plan.direct_rule_ids), len(plan.map_aware_rule_ids), len(all_ids),
+    )
+
     verification_results: list[dict[str, Any]] = []
     verification_state = "NOT_RUN"
     verification_note = "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
-
-    # Performance path: fact search and the main Rule Evaluator run concurrently.
-    # The main evaluator uses NOT_RUN verification, so it cannot punish unknown facts.
-    # After search finishes, only the existing fact-sensitive Rules (G001/G002) are
-    # selectively rechecked when search finds a material adverse signal.
     preliminary_verification_context = make_verification_context(False, [], state="NOT_RUN")
 
-    _emit_progress(
-        progress_callback,
-        "FACT_CHECKING" if verify_facts else "EVALUATING",
-        "正在并行执行规则审核与事实核验" if verify_facts else "正在执行规则审核",
-    )
-    parallel_started = time.perf_counter()
-    logger.info("[review] parallel_core start verify_facts=%s content_type=%s", verify_facts, content_type)
-
-    async def _main_evaluator_task():
+    # DIRECT_TEXT Rules do not require Article Map, so they can start while the map is
+    # still being built. This overlap is the main latency control for the new architecture.
+    async def _direct_evaluator_task():
         t = time.perf_counter()
-        logger.info("[review] evaluate_rules start content_type=%s verification=NOT_RUN", content_type)
+        logger.info("[review] direct_rules start count=%d", len(plan.direct_rule_ids))
         try:
             value = await asyncio.wait_for(
-                evaluate_rules(article, content_type, preliminary_verification_context),
+                evaluate_rule_ids(
+                    article, content_type, preliminary_verification_context, plan.direct_rule_ids,
+                    article_map=None, evaluation_mode="DIRECT_TEXT",
+                    system_role="DIRECT_RULE_EXECUTOR",
+                ),
                 timeout=settings.llm_evaluator_stage_timeout_seconds,
             )
         except asyncio.TimeoutError as exc:
             raise LLMError(
-                f"Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
+                f"Direct Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
             ) from exc
         logger.info(
-            "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d",
-            time.perf_counter() - t,
-            len(value.get("failed_rules", [])),
-            len(value.get("unresolved_rules", [])),
+            "[review] direct_rules done elapsed=%.2fs failed=%d unresolved=%d",
+            time.perf_counter() - t, len(value.get("failed_rules", [])), len(value.get("unresolved_rules", [])),
+        )
+        return value
+
+    _emit_progress(
+        progress_callback, "EVALUATING",
+        "正在并行建立文章结构图并执行可直接判断的 Rules",
+    )
+    direct_task = asyncio.create_task(_direct_evaluator_task())
+
+    representation = await representation_task
+    if representation is not None and representation.state == "READY":
+        article_map = representation.article_map
+        preselected_claims = representation.fact_claims if verify_facts else None
+        article_map_state = "READY"
+    else:
+        article_map = unavailable_article_map("Article Map 生成失败；MAP_AWARE Rules 已降级为直接读取原文。")
+        preselected_claims = None
+        article_map_state = "NOT_RUN"
+
+    _emit_progress(
+        progress_callback,
+        "FACT_CHECKING" if verify_facts else "EVALUATING",
+        "正在并行执行全文型 Rules 与事实核验" if verify_facts else "正在执行全文型 Rules",
+    )
+    mapped_started = time.perf_counter()
+
+    async def _map_evaluator_task():
+        t = time.perf_counter()
+        logger.info(
+            "[review] map_aware_rules start count=%d map_state=%s",
+            len(plan.map_aware_rule_ids), article_map_state,
+        )
+        try:
+            value = await asyncio.wait_for(
+                evaluate_rule_ids(
+                    article, content_type, preliminary_verification_context, plan.map_aware_rule_ids,
+                    article_map=article_map if article_map_state == "READY" else None,
+                    evaluation_mode="MAP_AWARE" if article_map_state == "READY" else "DIRECT_TEXT",
+                    system_role="MAP_AWARE_RULE_EXECUTOR",
+                ),
+                timeout=settings.llm_evaluator_stage_timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise LLMError(
+                f"Map-aware Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
+            ) from exc
+        logger.info(
+            "[review] map_aware_rules done elapsed=%.2fs failed=%d unresolved=%d",
+            time.perf_counter() - t, len(value.get("failed_rules", [])), len(value.get("unresolved_rules", [])),
         )
         return value
 
@@ -687,22 +780,29 @@ async def review_article(
         if not verify_facts:
             return None
         t = time.perf_counter()
-        logger.info("[review] fact_search start")
+        logger.info(
+            "[review] fact_search start claims_source=%s",
+            "article_map" if preselected_claims is not None else "fallback_extractor",
+        )
         try:
-            value = await verify_article_facts(article, content_type)
+            value = await verify_article_facts(
+                article, content_type, preselected_claims=preselected_claims
+            )
             logger.info(
                 "[review] fact_search done elapsed=%.2fs state=%s results=%d",
-                time.perf_counter() - t,
-                value.state,
-                len(value.results),
+                time.perf_counter() - t, value.state, len(value.results),
             )
             return value
         except Exception as exc:
             logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
             return None
 
-    eval_result, fact_outcome = await asyncio.gather(_main_evaluator_task(), _fact_search_task())
-    logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
+    map_task = asyncio.create_task(_map_evaluator_task())
+    fact_task = asyncio.create_task(_fact_search_task())
+    direct_result, map_result, fact_outcome = await asyncio.gather(direct_task, map_task, fact_task)
+    logger.info("[review] split_rule_core done elapsed_since_map_ready=%.2fs", time.perf_counter() - mapped_started)
+
+    eval_result = merge_disjoint_rule_evaluations([direct_result, map_result], content_type)
 
     if verify_facts:
         if fact_outcome is not None:
@@ -717,7 +817,9 @@ async def review_article(
     verification_context = make_verification_context(verify_facts, verification_results, state=verification_state)
     validate_eval(eval_result, content_type)
 
-    # Only adverse, high-impact search findings trigger a small targeted recheck.
+    # Search findings remain evidence inputs only. When material adverse evidence exists,
+    # only the existing fact-sensitive Rules are rechecked; Article Map is passed as
+    # navigation context, never as a new criterion.
     fact_rule_ids = [rid for rid in FACT_SENSITIVE_RULE_IDS if rid in applicable_rule_ids(content_type)]
     if verify_facts and fact_rule_ids and verification_requires_rule_recheck(verification_results):
         _emit_progress(progress_callback, "ADJUDICATING", "正在复核事实敏感规则")
@@ -725,7 +827,10 @@ async def review_article(
         logger.info("[review] fact_sensitive_recheck start rules=%s", fact_rule_ids)
         try:
             subset = await asyncio.wait_for(
-                evaluate_rule_subset(article, content_type, verification_context, fact_rule_ids),
+                evaluate_rule_subset(
+                    article, content_type, verification_context, fact_rule_ids,
+                    article_map=article_map if article_map_state == "READY" else None,
+                ),
                 timeout=settings.llm_adjudicator_stage_timeout_seconds,
             )
             eval_result = merge_rule_subset(eval_result, subset, fact_rule_ids)
@@ -747,19 +852,22 @@ async def review_article(
     if eval_result.get("unresolved_rules", []):
         try:
             eval_result = await asyncio.wait_for(
-                adjudicate_unresolved(article, content_type, eval_result, verification_context),
+                adjudicate_unresolved(
+                    article, content_type, eval_result, verification_context,
+                    article_map=article_map if article_map_state == "READY" else None,
+                ),
                 timeout=settings.llm_adjudicator_stage_timeout_seconds,
             )
         except asyncio.TimeoutError:
             logger.warning("[review] adjudicate_unresolved timeout; preserving UNRESOLVED without blocking")
     else:
         eval_result = await adjudicate_unresolved(
-            article, content_type, eval_result, verification_context
+            article, content_type, eval_result, verification_context,
+            article_map=article_map if article_map_state == "READY" else None,
         )
     logger.info(
         "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d",
-        time.perf_counter() - t0,
-        len(eval_result.get("unresolved_rules", [])),
+        time.perf_counter() - t0, len(eval_result.get("unresolved_rules", [])),
     )
     validate_eval(eval_result, content_type)
 
@@ -769,14 +877,10 @@ async def review_article(
     agg = aggregate(eval_result)
     logger.info(
         "[review] aggregate done elapsed=%.2fs final=%s failed=%d",
-        time.perf_counter() - t0,
-        agg["final_judgement"],
-        len(agg["failed_rule_ids"]),
+        time.perf_counter() - t0, agg["final_judgement"], len(agg["failed_rule_ids"]),
     )
 
-    # Strength extraction and feedback composition depend on the same completed Rule
-    # evaluation but not on each other. Run them concurrently. Both are non-gating:
-    # timeout/failure must never alter Rule results, Gate aggregation or final judgement.
+    # Gate aggregation is intentionally unchanged. Strength/feedback remain non-gating.
     secondary_timeout = settings.llm_secondary_timeout_seconds
 
     async def _strength_stage():
@@ -784,7 +888,10 @@ async def review_article(
         logger.info("[review] extract_strengths start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
         try:
             value = await asyncio.wait_for(
-                extract_strengths(article, content_type, eval_result),
+                extract_strengths(
+                    article, content_type, eval_result,
+                    article_map=article_map if article_map_state == "READY" else None,
+                ),
                 timeout=secondary_timeout + 5,
             )
             logger.info("[review] extract_strengths done elapsed=%.2fs strengths=%d", time.perf_counter() - t, len(value))
@@ -813,10 +920,7 @@ async def review_article(
     strengths, feedback = await asyncio.gather(_strength_stage(), _feedback_stage())
     logger.info("[review] postprocess_parallel done elapsed=%.2fs", time.perf_counter() - t0)
 
-    # Positive feedback is produced by its own PASS-grounded extractor, never by the
-    # negative Feedback Composer. It cannot change Gate/final judgement.
     feedback["strengths"] = strengths
-
     core = feedback.get("core_diagnosis")
     core_text = core.get("text") if isinstance(core, dict) else None
 
@@ -840,10 +944,9 @@ async def review_article(
 
     _emit_progress(progress_callback, "COMPLETED", "审核完成")
     logger.info(
-        "[review] complete elapsed=%.2fs final=%s issues=%d strengths=%d",
-        time.perf_counter() - review_started,
-        result["final_judgement"],
-        len(result["issues"]),
-        len(result["strengths"]),
+        "[review] complete elapsed=%.2fs final=%s issues=%d strengths=%d map_state=%s",
+        time.perf_counter() - review_started, result["final_judgement"],
+        len(result["issues"]), len(result["strengths"]), article_map_state,
     )
     return result
+

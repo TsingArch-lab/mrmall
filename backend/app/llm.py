@@ -196,6 +196,26 @@ class OpenAICompatibleProvider(Provider):
 
 class MockProvider(Provider):
     async def generate_json(self, system: str, user: str) -> dict[str, Any]:
+        if "ARTICLE_MAP_BUILDER" in system or "ARTICLE_MAP_BUILDER" in user:
+            article_match = re.search(r"ARTICLE:\n(.+)", user, re.S)
+            article = article_match.group(1).strip() if article_match else ""
+            quote = article[:80].strip()
+            return {
+                "core_question": "MOCK：文章主要任务",
+                "thesis": "MOCK：文章核心判断",
+                "units": [{
+                    "unit_id": "U01",
+                    "heading": "MOCK",
+                    "anchor_quote": quote,
+                    "role": "opening",
+                    "main_claim": "MOCK：首个论证单元",
+                    "evidence_used": [],
+                    "mechanism": "",
+                    "relation_to_prior": "opens",
+                    "new_contribution": "提出文章任务",
+                }] if quote else [],
+                "fact_claims": [],
+            }
         if "CONTENT_TYPE_ROUTER" in system or "CONTENT_TYPE_ROUTER" in user:
             return {
                 "content_type": "D",

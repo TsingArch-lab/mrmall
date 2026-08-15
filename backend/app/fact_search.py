@@ -42,6 +42,56 @@ def fact_search_available() -> bool:
     return settings.fact_search_provider.lower().strip() == "tavily" and bool(_search_key())
 
 
+def normalize_claim_items(items: Any) -> list[dict[str, Any]]:
+    """Normalize and prioritize fact-search candidates from any upstream extractor.
+
+    The selection semantics are unchanged from v0.1.7.2. Article Map may now
+    supply the candidates so the search path can reuse the same representation call.
+    """
+    out: list[dict[str, Any]] = []
+    seen = set()
+    if not isinstance(items, list):
+        return out
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        claim = str(item.get("claim", "")).strip()
+        query = str(item.get("search_query", "")).strip()
+        ctype = str(item.get("type", "case")).strip().lower()
+        risk_tag = str(item.get("risk_tag", "other")).strip().lower()
+        importance = str(item.get("importance", "medium")).strip().lower()
+        if not claim or not query or claim in seen:
+            continue
+        if ctype not in VALID_TYPES:
+            ctype = "case"
+        if risk_tag not in VALID_RISK_TAGS:
+            risk_tag = "other"
+        if risk_tag in {"anchor", "named_story", "quote", "authority_attribution"}:
+            importance = "high"
+        elif importance not in {"high", "medium"}:
+            importance = "medium"
+        seen.add(claim)
+        out.append({
+            "claim": claim,
+            "type": ctype,
+            "risk_tag": risk_tag,
+            "importance": importance,
+            "search_query": query,
+        })
+
+    priority = {
+        "authority_attribution": 0,
+        "anchor": 1,
+        "named_story": 2,
+        "quote": 3,
+        "operating_metric": 4,
+        "extreme_claim": 5,
+        "other": 6,
+    }
+    out.sort(key=lambda x: (priority.get(x["risk_tag"], 9), 0 if x["importance"] == "high" else 1))
+    return out[: settings.fact_search_max_claims]
+
+
 async def _extract_claims(article: str, content_type: str) -> list[dict[str, Any]]:
     system = """你是 FACT_CLAIM_EXTRACTOR。你的唯一任务是从文章中挑选最值得联网核验的客观事实声明。
 
@@ -92,42 +142,7 @@ search_query 要适合直接送入中文互联网搜索，保留关键专名、�
         timeout=settings.fact_verifier_timeout_seconds,
     )
     items = raw.get("claims", []) if isinstance(raw, dict) else []
-    out: list[dict[str, Any]] = []
-    seen = set()
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        claim = str(item.get("claim", "")).strip()
-        query = str(item.get("search_query", "")).strip()
-        ctype = str(item.get("type", "case")).strip().lower()
-        risk_tag = str(item.get("risk_tag", "other")).strip().lower()
-        importance = str(item.get("importance", "medium")).strip().lower()
-        if not claim or not query or claim in seen:
-            continue
-        if ctype not in VALID_TYPES:
-            ctype = "case"
-        if risk_tag not in VALID_RISK_TAGS:
-            risk_tag = "other"
-        # User calibration: anchors, named stories, quotes and authority attributions
-        # are inherently high-priority verification targets.
-        if risk_tag in {"anchor", "named_story", "quote", "authority_attribution"}:
-            importance = "high"
-        elif importance not in {"high", "medium"}:
-            importance = "medium"
-        seen.add(claim)
-        out.append({"claim": claim, "type": ctype, "risk_tag": risk_tag, "importance": importance, "search_query": query})
-
-    priority = {
-        "authority_attribution": 0,
-        "anchor": 1,
-        "named_story": 2,
-        "quote": 3,
-        "operating_metric": 4,
-        "extreme_claim": 5,
-        "other": 6,
-    }
-    out.sort(key=lambda x: (priority.get(x["risk_tag"], 9), 0 if x["importance"] == "high" else 1))
-    return out[: settings.fact_search_max_claims]
+    return normalize_claim_items(items)
 
 
 async def _tavily_search(query: str) -> list[dict[str, Any]]:
@@ -288,20 +303,26 @@ source_level: primary=官方/政府/交易所/企业原始资料；authoritative
     return results
 
 
-async def verify_article_facts(article: str, content_type: str) -> FactSearchOutcome:
+async def verify_article_facts(
+    article: str, content_type: str, preselected_claims: list[dict[str, Any]] | None = None
+) -> FactSearchOutcome:
     if settings.fact_search_provider.lower().strip() != "tavily":
         return FactSearchOutcome("NOT_RUN", [], f"事实搜索未执行：不支持的 FACT_SEARCH_PROVIDER={settings.fact_search_provider}。")
     if not _search_key():
         return FactSearchOutcome("NOT_RUN", [], "事实搜索未执行：Render 后端尚未配置 FACT_SEARCH_API_KEY。")
 
     started = time.perf_counter()
-    logger.info("[fact-search] extract_claims start max=%d", settings.fact_search_max_claims)
-    try:
-        claims = await _extract_claims(article, content_type)
-    except Exception as exc:
-        logger.warning("[fact-search] claim extraction failed: %s", exc)
-        return FactSearchOutcome("NOT_RUN", [], "事实搜索未完成：关键事实识别失败，本次审核仍按未联网核验处理。")
-    logger.info("[fact-search] extract_claims done claims=%d elapsed=%.2fs", len(claims), time.perf_counter() - started)
+    if preselected_claims is not None:
+        claims = normalize_claim_items(preselected_claims)
+        logger.info("[fact-search] reuse_article_map_claims claims=%d elapsed=%.2fs", len(claims), time.perf_counter() - started)
+    else:
+        logger.info("[fact-search] extract_claims fallback start max=%d", settings.fact_search_max_claims)
+        try:
+            claims = await _extract_claims(article, content_type)
+        except Exception as exc:
+            logger.warning("[fact-search] claim extraction failed: %s", exc)
+            return FactSearchOutcome("NOT_RUN", [], "事实搜索未完成：关键事实识别失败，本次审核仍按未联网核验处理。")
+        logger.info("[fact-search] extract_claims fallback done claims=%d elapsed=%.2fs", len(claims), time.perf_counter() - started)
     if not claims:
         return FactSearchOutcome("PARTIAL", [], "已执行事实扫描，但未识别到需要优先联网核验的关键客观事实。", 0)
 
