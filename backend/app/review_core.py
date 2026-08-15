@@ -209,7 +209,6 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
     raw = await provider.generate_json(
         "你是严格的 RULE_BATCH_EVALUATOR。只能执行输入 Rules，必须严格按指定 JSON 契约输出。",
         user,
-        reasoning_effort="max",
     )
     try:
         return normalize_rule_evaluation(
@@ -242,13 +241,124 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
             ) from first_exc
 
 
-async def evaluate_rule_subset(
-    article: str,
-    content_type: str,
-    verification_context,
-    rule_ids: list[str],
-    reasoning_effort: str | None = None,
+async def diagnostic_evaluate_single_rule(
+    article: str, content_type: str, verification_context, rule_id: str
 ):
+    """Run one already-applicable Rule in isolation for diagnostics only.
+
+    The returned result is never merged into the formal evaluation and therefore
+    cannot affect Gate aggregation, feedback, or author-facing output.
+    """
+    applicable = set(applicable_rule_ids(content_type))
+    if rule_id not in applicable:
+        return None
+
+    reg = rules_by_id()
+    keys = [
+        "rule_id", "name", "stage", "severity", "evaluation_question",
+        "pass_condition", "fail_condition", "exceptions",
+    ]
+    rule = [{k: reg[rule_id].get(k) for k in keys}]
+    provider = get_provider()
+
+    if rule_id == "S005":
+        # Diagnostic experiment only: test S005 with a minimal "ownership test".
+        # This exposes whether the model can see cross-section boundary failure
+        # without Article Map, deletion tests, or any new content criterion.
+        diagnostic_user = f"""
+CONTENT_TYPE: {content_type}
+
+RULE:
+{json.dumps(rule[0], ensure_ascii=False, indent=2)}
+
+ARTICLE:
+{article}
+
+你现在只诊断 S005。不要评价文章总体好坏，也不要调用任何其他 Rule。
+
+先判断文章主要小标题之间属于并列还是递进关系。
+如果属于并列关系，只做一个“归属测试”：
+- 概括每个主要章节实际承担的论证对象；
+- 检查各章节中的主要事实、案例、机制和判断，是否有大量内容放到另一个并列小标题下也同样自然成立；
+- 重点判断这是少量正常关联，还是持续、成片的跨章节可互换，导致章节边界失效。
+
+不要因为几个章节都服务同一个总论点就判 FAIL；同一总论点完全可以从不同角度展开。
+也不要要求章节彼此绝对独立；少量呼应、铺垫、总结都可以接受。
+只有当多个主要章节的论证材料和判断大面积交叉、彼此可互换，导致小标题无法稳定区分各自承担什么时，才命中 S005 的失败条件。
+
+如果属于递进关系，则按现有 S005 的跳跃逻辑判断，不强行套用归属测试。
+
+先输出简洁诊断：
+1. relation_type：并列 / 递进 / 混合；
+2. section_roles：每个主要章节实际在论证什么；
+3. cross_assignment：列出最重要的跨章节可互换内容，若没有则为空；
+4. boundary_observation：边界是否清晰。
+
+完成后，再严格依据 S005 的 evaluation_question / pass_condition / fail_condition / exceptions 判定。
+
+只输出一个 JSON 对象，格式必须是：
+{{
+  "diagnostic_analysis": {{
+    "relation_type": "...",
+    "section_roles": [{{"section":"...","role":"..."}}],
+    "cross_assignment": [{{"content":"...","current_section":"...","also_fits":"...","why":"..."}}],
+    "boundary_observation": "..."
+  }},
+  "content_type": "{content_type}",
+  "evaluated_rule_ids": ["S005"],
+  "passed_rule_ids": [],
+  "failed_rules": [],
+  "na_rule_ids": [],
+  "unresolved_rules": []
+}}
+
+最终四个状态桶必须且只能有一个包含 S005：
+- PASS: passed_rule_ids=["S005"]
+- FAIL: failed_rules=[{{"rule_id":"S005","article_evidence":["原文证据1","原文证据2"],"match_explanation":"这些证据如何命中现有 fail_condition"}}]
+- NA: na_rule_ids=["S005"]
+- UNRESOLVED: unresolved_rules=[{{"rule_id":"S005","why_unresolved":"..."}}]
+
+不得新增判断标准。diagnostic_analysis 只用于观察你的识别过程，不进入正式审核。
+"""
+        raw = await provider.generate_json(
+            "你是 S005_DIAGNOSTIC_OWNERSHIP_TESTER。只做小标题关系与归属测试，再只依据现有 S005 判定。"
+            "不得参考其他 Rule，不得输出总体文章评价。只输出指定 JSON。",
+            diagnostic_user,
+        )
+        diagnostic_analysis = raw.pop("diagnostic_analysis", None) if isinstance(raw, dict) else None
+        if diagnostic_analysis is not None:
+            logger.info(
+                "[diagnostic] s005_ownership analysis=%s",
+                json.dumps(diagnostic_analysis, ensure_ascii=False),
+            )
+
+    else:
+        evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+        user = _render(
+            evaluator,
+            {
+                "CONTENT_TYPE": content_type,
+                "APPLICABLE_RULES_COMPACT": rule,
+                "VERIFICATION_RESULTS": verification_context.results,
+                "VERIFICATION_GUARD": verification_guard_text(verification_context),
+                "ARTICLE": article,
+            },
+        )
+        raw = await provider.generate_json(
+            "你是 SINGLE_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的这一条 Rule。"
+            "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
+            user,
+        )
+
+    return normalize_rule_evaluation(
+        raw,
+        content_type=content_type,
+        supplied_rule_ids=[rule_id],
+        verification_context=verification_context,
+    )
+
+
+async def evaluate_rule_subset(article: str, content_type: str, verification_context, rule_ids: list[str]):
     """Evaluate only an explicit subset of already-applicable Rules.
 
     Used by the fact-check performance path after the main evaluator has run in
@@ -277,9 +387,8 @@ async def evaluate_rule_subset(
     )
     provider = get_provider()
     raw = await provider.generate_json(
-        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的 Rules，不得重审其他规则。",
+        "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的事实敏感 Rules，不得重审其他规则。",
         user,
-        reasoning_effort=reasoning_effort,
     )
     return normalize_rule_evaluation(
         raw,
@@ -621,6 +730,71 @@ def _emit_progress(progress_callback: Callable[[str, str], None] | None, stage: 
             logger.debug("progress callback failed", exc_info=True)
 
 
+
+async def pure_two_rule_test(article: str, content_type: str, verification_context):
+    """Temporary diagnostic: evaluate only S005 and S007 with V4-Pro MAX.
+
+    This bypasses the normal Rule Batch, Gate, feedback, strengths, and fact-search pipeline.
+    It is for one controlled benchmark run only.
+    """
+    rule_ids = ["S005", "S007"]
+    applicable = set(applicable_rule_ids(content_type))
+    supplied_ids = [rid for rid in rule_ids if rid in applicable]
+    if not supplied_ids:
+        raise LLMError("S005/S007 are not applicable for this content type")
+
+    reg = rules_by_id()
+    keys = [
+        "rule_id", "name", "stage", "severity", "evaluation_question",
+        "pass_condition", "fail_condition", "exceptions",
+    ]
+    rules = [{k: reg[rid].get(k) for k in keys} for rid in supplied_ids]
+    evaluator = (PROMPTS / "01_rule_batch_evaluator.md").read_text(encoding="utf-8")
+    user = _render(
+        evaluator,
+        {
+            "CONTENT_TYPE": content_type,
+            "APPLICABLE_RULES_COMPACT": rules,
+            "VERIFICATION_RESULTS": verification_context.results,
+            "VERIFICATION_GUARD": verification_guard_text(verification_context),
+            "ARTICLE": article,
+        },
+    )
+
+    provider = get_provider()
+    logger.info(
+        "[diagnostic] pure_two_rule start rules=%s reasoning_effort=max",
+        supplied_ids,
+    )
+    started = time.perf_counter()
+    raw = await provider.generate_json(
+        "你是 PURE_TWO_RULE_DIAGNOSTIC_EVALUATOR。只执行输入的 S005 与 S007 两条 Rule。"
+        "不得参考其他 Rule，不得输出总体文章评价。必须严格按指定 JSON 契约输出。",
+        user,
+        reasoning_effort="max",
+    )
+    result = normalize_rule_evaluation(
+        raw,
+        content_type=content_type,
+        supplied_rule_ids=supplied_ids,
+        verification_context=verification_context,
+    )
+    logger.info(
+        "[diagnostic] pure_two_rule done elapsed=%.2fs passed=%s failed=%s unresolved=%s",
+        time.perf_counter() - started,
+        result.get("passed_rule_ids", []),
+        [x.get("rule_id") for x in result.get("failed_rules", [])],
+        [x.get("rule_id") for x in result.get("unresolved_rules", [])],
+    )
+    for item in result.get("failed_rules", []):
+        logger.info(
+            "[diagnostic] pure_two_rule fail rule=%s evidence=%s explanation=%s",
+            item.get("rule_id"),
+            json.dumps(item.get("article_evidence", []), ensure_ascii=False),
+            item.get("match_explanation", ""),
+        )
+    return result
+
 async def review_article(
     article: str, content_type: str, verify_facts: bool = False,
     progress_callback: Callable[[str, str], None] | None = None,
@@ -628,287 +802,72 @@ async def review_article(
     review_started = time.perf_counter()
     requested_type = content_type
     logger.info(
-        "[review] start content_type=%s article_chars=%d verify_facts=%s",
+        "[review] PURE TEST start content_type=%s article_chars=%d",
         requested_type,
         len(article),
-        verify_facts,
     )
 
-    _emit_progress(progress_callback, "STARTING", "正在准备审核")
+    _emit_progress(progress_callback, "STARTING", "正在准备纯双规则测试")
 
     if content_type == "AUTO":
         _emit_progress(progress_callback, "ROUTING", "正在判断文章类型")
-        t0 = time.perf_counter()
-        logger.info("[review] route_content_type start")
-        try:
-            content_type = await asyncio.wait_for(
-                route_content_type(article),
-                timeout=settings.llm_router_stage_timeout_seconds,
-            )
-        except asyncio.TimeoutError as exc:
-            raise LLMError("自动判断文章类型超时。请手动选择 A/B/C/D/E 后重试。") from exc
-        logger.info(
-            "[review] route_content_type done elapsed=%.2fs resolved_type=%s",
-            time.perf_counter() - t0,
-            content_type,
+        content_type = await asyncio.wait_for(
+            route_content_type(article),
+            timeout=settings.llm_router_stage_timeout_seconds,
         )
 
-    verification_results: list[dict[str, Any]] = []
-    verification_state = "NOT_RUN"
-    verification_note = "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
+    verification_context = make_verification_context(False, [], state="NOT_RUN")
+    _emit_progress(progress_callback, "EVALUATING", "正在执行 S005 / S007 双规则测试")
 
-    # Performance path: fact search and the main Rule Evaluator run concurrently.
-    # The main evaluator uses NOT_RUN verification, so it cannot punish unknown facts.
-    # After search finishes, only the existing fact-sensitive Rules (G001/G002) are
-    # selectively rechecked when search finds a material adverse signal.
-    preliminary_verification_context = make_verification_context(False, [], state="NOT_RUN")
-
-    _emit_progress(
-        progress_callback,
-        "FACT_CHECKING" if verify_facts else "EVALUATING",
-        "正在并行执行规则审核与事实核验" if verify_facts else "正在执行规则审核",
-    )
-    parallel_started = time.perf_counter()
-    logger.info("[review] parallel_core start verify_facts=%s content_type=%s", verify_facts, content_type)
-
-    async def _main_evaluator_task():
-        t = time.perf_counter()
-        logger.info("[review] evaluate_rules start content_type=%s verification=NOT_RUN", content_type)
-        try:
-            value = await asyncio.wait_for(
-                evaluate_rules(article, content_type, preliminary_verification_context),
-                timeout=settings.llm_evaluator_stage_timeout_seconds,
-            )
-        except asyncio.TimeoutError as exc:
-            raise LLMError(
-                f"Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
-            ) from exc
-        logger.info(
-            "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d failed_ids=%s unresolved_ids=%s",
-            time.perf_counter() - t,
-            len(value.get("failed_rules", [])),
-            len(value.get("unresolved_rules", [])),
-            [x.get("rule_id") for x in value.get("failed_rules", [])],
-            [x.get("rule_id") for x in value.get("unresolved_rules", [])],
-        )
-        return value
-
-    async def _fact_search_task():
-        if not verify_facts:
-            return None
-        t = time.perf_counter()
-        logger.info("[review] fact_search start")
-        try:
-            value = await verify_article_facts(article, content_type)
-            logger.info(
-                "[review] fact_search done elapsed=%.2fs state=%s results=%d",
-                time.perf_counter() - t,
-                value.state,
-                len(value.results),
-            )
-            return value
-        except Exception as exc:
-            logger.warning("[review] fact_search degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
-            return None
-
-    async def _two_rule_diagnostic_task():
-        diagnostic_ids = [rid for rid in ["S005", "S007"] if rid in applicable_rule_ids(content_type)]
-        if not diagnostic_ids:
-            logger.info("[diagnostic] two_rule skipped rules=S005,S007 reason=not_applicable")
-            return None
-        t = time.perf_counter()
-        logger.info("[diagnostic] two_rule start rules=%s reasoning_effort=max", diagnostic_ids)
-        try:
-            value = await asyncio.wait_for(
-                evaluate_rule_subset(
-                    article,
-                    content_type,
-                    preliminary_verification_context,
-                    diagnostic_ids,
-                    reasoning_effort="max",
-                ),
-                timeout=settings.llm_evaluator_stage_timeout_seconds,
-            )
-            failed = {x.get("rule_id"): x for x in value.get("failed_rules", [])}
-            unresolved = {x.get("rule_id"): x for x in value.get("unresolved_rules", [])}
-            statuses = {}
-            for rid in diagnostic_ids:
-                if rid in failed:
-                    statuses[rid] = "FAIL"
-                elif rid in unresolved:
-                    statuses[rid] = "UNRESOLVED"
-                elif rid in value.get("na_rule_ids", []):
-                    statuses[rid] = "NA"
-                elif rid in value.get("passed_rule_ids", []):
-                    statuses[rid] = "PASS"
-                else:
-                    statuses[rid] = "MISSING"
-            logger.info(
-                "[diagnostic] two_rule done elapsed=%.2fs statuses=%s",
-                time.perf_counter() - t,
-                json.dumps(statuses, ensure_ascii=False),
-            )
-            for rid, item in failed.items():
-                logger.info(
-                    "[diagnostic] two_rule fail rule=%s evidence=%s explanation=%s",
-                    rid,
-                    json.dumps(item.get("article_evidence", []), ensure_ascii=False),
-                    item.get("match_explanation", ""),
-                )
-            return value
-        except Exception as exc:
-            logger.warning(
-                "[diagnostic] two_rule error elapsed=%.2fs error=%s",
-                time.perf_counter() - t,
-                exc,
-            )
-            return None
-
-    eval_result, fact_outcome, _two_rule_diagnostic = await asyncio.gather(
-        _main_evaluator_task(), _fact_search_task(), _two_rule_diagnostic_task()
-    )
-    logger.info("[review] parallel_core done elapsed=%.2fs", time.perf_counter() - parallel_started)
-
-    if verify_facts:
-        if fact_outcome is not None:
-            verification_results = fact_outcome.results
-            verification_state = fact_outcome.state
-            verification_note = fact_outcome.note
-        else:
-            verification_state = "NOT_RUN"
-            verification_results = []
-            verification_note = "事实搜索发生异常，本次审核已自动降级为未联网核验；不会因为搜索失败判文章事实错误。"
-
-    verification_context = make_verification_context(verify_facts, verification_results, state=verification_state)
-    validate_eval(eval_result, content_type)
-
-    # Only adverse, high-impact search findings trigger a small targeted recheck.
-    fact_rule_ids = [rid for rid in FACT_SENSITIVE_RULE_IDS if rid in applicable_rule_ids(content_type)]
-    if verify_facts and fact_rule_ids and verification_requires_rule_recheck(verification_results):
-        _emit_progress(progress_callback, "ADJUDICATING", "正在复核事实敏感规则")
-        t0 = time.perf_counter()
-        logger.info("[review] fact_sensitive_recheck start rules=%s", fact_rule_ids)
-        try:
-            subset = await asyncio.wait_for(
-                evaluate_rule_subset(article, content_type, verification_context, fact_rule_ids),
-                timeout=settings.llm_adjudicator_stage_timeout_seconds,
-            )
-            eval_result = merge_rule_subset(eval_result, subset, fact_rule_ids)
-            logger.info("[review] fact_sensitive_recheck done elapsed=%.2fs", time.perf_counter() - t0)
-        except Exception as exc:
-            logger.warning("[review] fact_sensitive_recheck degraded elapsed=%.2fs error=%s", time.perf_counter() - t0, exc)
-    elif verify_facts:
-        logger.info("[review] fact_sensitive_recheck skipped: no material adverse verification signal")
-
-    validate_eval(eval_result, content_type)
-
-    if eval_result.get("unresolved_rules", []):
-        _emit_progress(progress_callback, "ADJUDICATING", "正在复核未决规则")
-    t0 = time.perf_counter()
-    logger.info(
-        "[review] adjudicate_unresolved start unresolved=%d",
-        len(eval_result.get("unresolved_rules", [])),
-    )
-    if eval_result.get("unresolved_rules", []):
-        try:
-            eval_result = await asyncio.wait_for(
-                adjudicate_unresolved(article, content_type, eval_result, verification_context),
-                timeout=settings.llm_adjudicator_stage_timeout_seconds,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("[review] adjudicate_unresolved timeout; preserving UNRESOLVED without blocking")
-    else:
-        eval_result = await adjudicate_unresolved(
-            article, content_type, eval_result, verification_context
-        )
-    logger.info(
-        "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d",
-        time.perf_counter() - t0,
-        len(eval_result.get("unresolved_rules", [])),
-    )
-    validate_eval(eval_result, content_type)
-
-    _emit_progress(progress_callback, "AGGREGATING", "正在汇总规则结果")
-    t0 = time.perf_counter()
-    logger.info("[review] aggregate start")
-    agg = aggregate(eval_result)
-    logger.info(
-        "[review] aggregate done elapsed=%.2fs final=%s failed=%d",
-        time.perf_counter() - t0,
-        agg["final_judgement"],
-        len(agg["failed_rule_ids"]),
+    result = await asyncio.wait_for(
+        pure_two_rule_test(article, content_type, verification_context),
+        timeout=max(settings.llm_evaluator_stage_timeout_seconds, 360),
     )
 
-    # Strength extraction and feedback composition depend on the same completed Rule
-    # evaluation but not on each other. Run them concurrently. Both are non-gating:
-    # timeout/failure must never alter Rule results, Gate aggregation or final judgement.
-    secondary_timeout = settings.llm_secondary_timeout_seconds
+    failed = result.get("failed_rules", [])
+    failed_ids = [x.get("rule_id") for x in failed]
 
-    async def _strength_stage():
-        t = time.perf_counter()
-        logger.info("[review] extract_strengths start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
-        try:
-            value = await asyncio.wait_for(
-                extract_strengths(article, content_type, eval_result),
-                timeout=secondary_timeout + 5,
-            )
-            logger.info("[review] extract_strengths done elapsed=%.2fs strengths=%d", time.perf_counter() - t, len(value))
-            return value
-        except Exception as exc:
-            logger.warning("[review] extract_strengths degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
-            return []
+    # Minimal author-visible result so the web job can complete normally.
+    final = "需要修改" if failed_ids else "可以继续"
+    dims = {
+        "选题价值": "达标",
+        "证据支撑": "达标",
+        "观点质量": "达标",
+        "结构逻辑": "有明显问题" if failed_ids else "达标",
+        "表达质量": "达标",
+    }
+    issues = [
+        {
+            "text": f"{item.get('rule_id')}：{item.get('match_explanation','')}",
+            "supporting_rule_ids": [item.get("rule_id")],
+            "article_evidence": item.get("article_evidence", []),
+        }
+        for item in failed
+    ]
 
-    async def _feedback_stage():
-        t = time.perf_counter()
-        logger.info("[review] compose_feedback start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
-        try:
-            value = await asyncio.wait_for(
-                compose_feedback(eval_result, agg, verification_context.results),
-                timeout=secondary_timeout + 5,
-            )
-            logger.info("[review] compose_feedback done elapsed=%.2fs issues=%d", time.perf_counter() - t, len(value.get("issue_candidates", [])))
-            return value
-        except Exception as exc:
-            logger.warning("[review] compose_feedback degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
-            return deterministic_feedback_fallback(eval_result, agg)
-
-    _emit_progress(progress_callback, "POSTPROCESSING", "正在整理问题清单与值得保留")
-    t0 = time.perf_counter()
-    logger.info("[review] postprocess_parallel start")
-    strengths, feedback = await asyncio.gather(_strength_stage(), _feedback_stage())
-    logger.info("[review] postprocess_parallel done elapsed=%.2fs", time.perf_counter() - t0)
-
-    # Positive feedback is produced by its own PASS-grounded extractor, never by the
-    # negative Feedback Composer. It cannot change Gate/final judgement.
-    feedback["strengths"] = strengths
-
-    core = feedback.get("core_diagnosis")
-    core_text = core.get("text") if isinstance(core, dict) else None
-
-    result = {
+    out = {
         "review_id": str(uuid.uuid4()),
         "content_type": content_type,
-        "final_judgement": agg["final_judgement"],
-        "dimension_states": agg["dimension_states"],
-        "core_diagnosis": core_text,
-        "issues": feedback.get("issue_candidates", []),
-        "strengths": feedback.get("strengths", []),
-        "unresolved_rules": eval_result.get("unresolved_rules", []),
-        "failed_rule_ids": agg["failed_rule_ids"],
+        "final_judgement": final,
+        "dimension_states": dims,
+        "core_diagnosis": issues[0]["text"] if issues else None,
+        "issues": issues,
+        "strengths": [],
+        "unresolved_rules": result.get("unresolved_rules", []),
+        "failed_rule_ids": failed_ids,
         "model_provider": settings.llm_provider,
         "model": settings.llm_model or "mock",
         "registry_hash": registry_hash(),
-        "verification_note": verification_note,
-        "verification_state": verification_context.state,
-        "verification_results": verification_context.results,
+        "verification_note": "PURE S005/S007 diagnostic only; normal review pipeline bypassed.",
+        "verification_state": "NOT_RUN",
+        "verification_results": [],
     }
 
-    _emit_progress(progress_callback, "COMPLETED", "审核完成")
+    _emit_progress(progress_callback, "COMPLETED", "S005 / S007 双规则测试完成")
     logger.info(
-        "[review] complete elapsed=%.2fs final=%s issues=%d strengths=%d",
+        "[review] PURE TEST complete elapsed=%.2fs final=%s failed_ids=%s",
         time.perf_counter() - review_started,
-        result["final_judgement"],
-        len(result["issues"]),
-        len(result["strengths"]),
+        final,
+        failed_ids,
     )
-    return result
+    return out
