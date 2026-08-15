@@ -232,7 +232,9 @@ class MockProvider(Provider):
                 "issue_candidates": [],
                 "strengths": ["MOCK 模式：网站链路已跑通；此结果不是实际审稿结论。"],
             }
-        ids = re.findall(r'"rule_id"\s*:\s*"([A-Z0-9_]+)"', user)
+        rule_block = re.search(r"APPLICABLE_RULES_COMPACT:\n(.+?)\n\nVERIFICATION_RESULTS:", user, re.S)
+        source = rule_block.group(1) if rule_block else user
+        ids = re.findall(r'"rule_id"\s*:\s*"([A-Z0-9_]+)"', source)
         m = re.search(r"CONTENT_TYPE:\s*([A-E])", user)
         ctype = m.group(1) if m else "D"
         return {

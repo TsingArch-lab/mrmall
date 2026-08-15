@@ -26,6 +26,9 @@ class Settings:
     llm_model_secondary: str = os.getenv("LLM_MODEL_SECONDARY", "")
     llm_secondary_timeout_seconds: float = float(os.getenv("LLM_SECONDARY_TIMEOUT_SECONDS", "90"))
     llm_evaluator_stage_timeout_seconds: float = float(os.getenv("LLM_EVALUATOR_STAGE_TIMEOUT_SECONDS", "240"))
+    # Per Rule Test Batch timeout. Batches run concurrently; this does not add serial depth.
+    rule_test_batch_timeout_seconds: float = float(os.getenv("RULE_TEST_BATCH_TIMEOUT_SECONDS", "180"))
+    rule_test_trace_max_chars: int = int(os.getenv("RULE_TEST_TRACE_MAX_CHARS", "6000"))
     llm_router_stage_timeout_seconds: float = float(os.getenv("LLM_ROUTER_STAGE_TIMEOUT_SECONDS", "90"))
     llm_adjudicator_stage_timeout_seconds: float = float(os.getenv("LLM_ADJUDICATOR_STAGE_TIMEOUT_SECONDS", "90"))
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))

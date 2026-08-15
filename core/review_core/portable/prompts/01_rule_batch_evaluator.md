@@ -8,6 +8,8 @@
 - APPLICABLE_RULES_COMPACT
 - VERIFICATION_RESULTS（可选）
 - EVALUATION_MODE（DIRECT_TEXT / MAP_AWARE）
+- TEST_BATCH_NAME（执行分组名；仅用于执行，不是 Rule）
+- TEST_PLAN（由 supplied Rules 派生出的检查动作；不得增加评价标准）
 - ARTICLE_MAP（MAP_AWARE 时提供；DIRECT_TEXT 时仅为 NOT_USED 标记）
 
 ## 唯一任务
@@ -49,8 +51,24 @@
 
 对 I005 / F003：Map 用于定位全文的强判断与其实际支撑链。遇到“所有、任何、注定、从来、唯一、90%”等强确定性表达时，不因文章整体案例丰富而自动 PASS；仍只按 supplied Rule 的既有确定性/克制度条件执行。
 
+
+## Rule Test Plan（强制）
+- TEST_PLAN 只规定“如何执行 supplied Rules”，不能改变任何 Rule 的 pass/fail 条件。
+- 必须先完成 TEST_PLAN 指定的检查动作，再逐条裁决 supplied Rules；不得先形成“这篇文章总体不错/不好”的印象后批量赋值。
+- 一个 Rule 的 PASS 不能作为另一 Rule 的自动 PASS 理由。
+- 局部亮点不能自动抵消全文型 Rule 的命中，全文问题也不能自动让局部 Rule FAIL。
+- 可在标准输出字段之外附加 `test_trace` 供运行日志观察。`test_trace` 不是 Rule Result，程序会在 Gate 前丢弃；它不得创造或改变 PASS/FAIL。建议结构：
+  `{"batch_name":"...","operations_completed":["..."],"observations":[{"rule_id":"S007","signals":["B12/B13... "]}]}`
+- `test_trace.observations` 只能引用 supplied Rule IDs；没有观察信号时允许空数组。
+
+TEST_BATCH_NAME:
+{{TEST_BATCH_NAME}}
+
+TEST_PLAN:
+{{TEST_PLAN}}
+
 ## 输出
-严格符合 `rule_evaluation_schema.json`。不要输出 Schema 之外的字段。
+严格符合 `rule_evaluation_schema.json`。标准 Rule Result 必须符合 `rule_evaluation_schema.json`；仅允许额外附加运行时 `test_trace`，该字段会在契约归一化前被剥离且永不进入 Gate。
 
 必须输出一个 JSON 对象，且包含全部 6 个字段：
 `content_type`、`evaluated_rule_ids`、`passed_rule_ids`、`failed_rules`、`na_rule_ids`、`unresolved_rules`。

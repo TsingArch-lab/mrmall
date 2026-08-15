@@ -19,7 +19,7 @@ from .llm import LLMError, get_provider
 from .verification import FACT_SENSITIVE_RULE_IDS, make_verification_context, verification_guard_text
 from .fact_search import verify_article_facts
 from .article_map import build_article_representation, unavailable_article_map
-from .execution_plan import build_execution_plan
+from .execution_plan import build_execution_plan, build_rule_test_batches
 from .feedback_clustering import cluster_failed_rules
 
 logger = logging.getLogger("mall_content_os.review")
@@ -205,6 +205,8 @@ async def evaluate_rule_ids(
     article_map: dict[str, Any] | None = None,
     evaluation_mode: str = "DIRECT_TEXT",
     system_role: str = "RULE_BATCH_EVALUATOR",
+    test_batch_name: str = "",
+    test_plan: str = "",
 ):
     """Evaluate an explicit subset of already-applicable Rules.
 
@@ -233,6 +235,8 @@ async def evaluate_rule_ids(
             "VERIFICATION_RESULTS": verification_context.results,
             "VERIFICATION_GUARD": verification_guard_text(verification_context),
             "EVALUATION_MODE": evaluation_mode,
+            "TEST_BATCH_NAME": test_batch_name or "UNSPECIFIED",
+            "TEST_PLAN": test_plan or "按 supplied Rules 的原始条件逐条执行；不得新增标准。",
             "ARTICLE_MAP": map_payload,
             "ARTICLE": article,
         },
@@ -240,9 +244,29 @@ async def evaluate_rule_ids(
 
     provider = get_provider()
     raw = await provider.generate_json(
-        f"你是严格的 {system_role}。只能执行输入 Rules；Article Map 仅是描述性导航，不是规则或结论。必须严格按指定 JSON 契约输出。",
+        f"你是严格的 {system_role}。只能执行输入 Rules；Article Map 仅是描述性导航，不是规则或结论。必须按指定契约输出。",
         user,
     )
+    # Optional execution trace is observability only. It is never merged into Rule Results,
+    # never reaches Gate, and cannot create FAIL/PASS. Only supplied Rule IDs are logged.
+    trace = raw.get("test_trace") if isinstance(raw, dict) else None
+    if isinstance(trace, dict):
+        safe_obs = []
+        for item in trace.get("observations", []) if isinstance(trace.get("observations"), list) else []:
+            if not isinstance(item, dict):
+                continue
+            rid = str(item.get("rule_id", "")).strip()
+            if rid and rid in supplied_ids:
+                safe_obs.append({
+                    "rule_id": rid,
+                    "signals": item.get("signals", [])[:8] if isinstance(item.get("signals"), list) else [],
+                })
+        safe_trace = {
+            "batch_name": str(trace.get("batch_name") or test_batch_name or system_role)[:80],
+            "operations_completed": trace.get("operations_completed", [])[:12] if isinstance(trace.get("operations_completed"), list) else [],
+            "observations": safe_obs[:30],
+        }
+        logger.info("[rule-test] trace=%s", json.dumps(safe_trace, ensure_ascii=False)[:settings.rule_test_trace_max_chars])
     try:
         return normalize_rule_evaluation(
             raw, content_type=content_type, supplied_rule_ids=supplied_ids, verification_context=verification_context
@@ -292,7 +316,7 @@ async def evaluate_rule_subset(
     )
 
 
-def merge_disjoint_rule_evaluations(parts: list[dict[str, Any]], content_type: str) -> dict[str, Any]:
+def merge_disjoint_rule_evaluations(parts: list[dict[str, Any]], content_type: str, expected_rule_ids: list[str] | None = None) -> dict[str, Any]:
     """Merge disjoint execution paths and verify exact Rule coverage."""
     merged = {
         "content_type": content_type,
@@ -316,13 +340,14 @@ def merge_disjoint_rule_evaluations(parts: list[dict[str, Any]], content_type: s
         merged["failed_rules"] += part.get("failed_rules", [])
         merged["na_rule_ids"] += part.get("na_rule_ids", [])
         merged["unresolved_rules"] += part.get("unresolved_rules", [])
-    expected = set(applicable_rule_ids(content_type))
+    canonical_expected = list(expected_rule_ids) if expected_rule_ids is not None else applicable_rule_ids(content_type)
+    expected = set(canonical_expected)
     if seen != expected:
         missing = sorted(expected - seen)
         extra = sorted(seen - expected)
         raise ValueError(f"Rule execution coverage mismatch missing={missing} extra={extra}")
     # Preserve deterministic canonical Rule order in evaluated_rule_ids.
-    merged["evaluated_rule_ids"] = applicable_rule_ids(content_type)
+    merged["evaluated_rule_ids"] = canonical_expected
     return merged
 
 
@@ -752,26 +777,46 @@ async def review_article(
 
     async def _map_evaluator_task():
         t = time.perf_counter()
+        batches = build_rule_test_batches(plan.map_aware_rule_ids)
         logger.info(
-            "[review] map_aware_rules start count=%d map_state=%s",
-            len(plan.map_aware_rule_ids), article_map_state,
+            "[review] map_aware_rule_tests start batches=%d rules=%d map_state=%s layout=%s",
+            len(batches), len(plan.map_aware_rule_ids), article_map_state,
+            [(b.name, len(b.rule_ids)) for b in batches],
         )
-        try:
-            value = await asyncio.wait_for(
-                evaluate_rule_ids(
-                    article, content_type, preliminary_verification_context, plan.map_aware_rule_ids,
-                    article_map=article_map if article_map_state == "READY" else None,
-                    evaluation_mode="MAP_AWARE" if article_map_state == "READY" else "DIRECT_TEXT",
-                    system_role="MAP_AWARE_RULE_EXECUTOR",
-                ),
-                timeout=settings.llm_evaluator_stage_timeout_seconds,
+
+        async def _run_batch(batch):
+            bt = time.perf_counter()
+            logger.info("[rule-test] batch start name=%s rules=%s", batch.name, batch.rule_ids)
+            try:
+                value = await asyncio.wait_for(
+                    evaluate_rule_ids(
+                        article, content_type, preliminary_verification_context, batch.rule_ids,
+                        article_map=article_map if article_map_state == "READY" else None,
+                        evaluation_mode="MAP_AWARE" if article_map_state == "READY" else "DIRECT_TEXT",
+                        system_role=f"RULE_TEST_{batch.name}",
+                        test_batch_name=batch.name,
+                        test_plan=batch.test_plan,
+                    ),
+                    timeout=settings.rule_test_batch_timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise LLMError(
+                    f"Rule Test Batch {batch.name} 超过 {settings.rule_test_batch_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
+                ) from exc
+            logger.info(
+                "[rule-test] batch done name=%s elapsed=%.2fs failed=%s unresolved=%s",
+                batch.name, time.perf_counter() - bt,
+                [x.get("rule_id") for x in value.get("failed_rules", [])],
+                [x.get("rule_id") for x in value.get("unresolved_rules", [])],
             )
-        except asyncio.TimeoutError as exc:
-            raise LLMError(
-                f"Map-aware Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
-            ) from exc
+            return value
+
+        # Batches are independent exact partitions of the same existing Rule set. Run them
+        # concurrently to add execution discipline without adding serial review depth.
+        parts = await asyncio.gather(*[asyncio.create_task(_run_batch(b)) for b in batches])
+        value = merge_disjoint_rule_evaluations(parts, content_type, expected_rule_ids=plan.map_aware_rule_ids)
         logger.info(
-            "[review] map_aware_rules done elapsed=%.2fs failed=%d unresolved=%d",
+            "[review] map_aware_rule_tests done elapsed=%.2fs failed=%d unresolved=%d",
             time.perf_counter() - t, len(value.get("failed_rules", [])), len(value.get("unresolved_rules", [])),
         )
         return value
