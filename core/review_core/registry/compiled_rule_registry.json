@@ -3,7 +3,7 @@
   "content_semantics_version": "0.4.1-md-source",
   "runtime_version": "0.4.1",
   "single_source_of_truth": "rules/*.md",
-  "generated_at_utc": "2026-08-14T17:00:00.843120+00:00",
+  "generated_at_utc": "2026-08-14T17:28:02.773315+00:00",
   "rule_count": 48,
   "rules": [
     {

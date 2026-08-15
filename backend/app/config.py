@@ -21,6 +21,13 @@ class Settings:
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_base_url: str = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/")
     llm_model: str = os.getenv("LLM_MODEL", "")
+    # Optional faster model for non-gating author-facing post-processing.
+    # If omitted, secondary stages reuse LLM_MODEL.
+    llm_model_secondary: str = os.getenv("LLM_MODEL_SECONDARY", "")
+    llm_secondary_timeout_seconds: float = float(os.getenv("LLM_SECONDARY_TIMEOUT_SECONDS", "90"))
+    llm_evaluator_stage_timeout_seconds: float = float(os.getenv("LLM_EVALUATOR_STAGE_TIMEOUT_SECONDS", "240"))
+    llm_router_stage_timeout_seconds: float = float(os.getenv("LLM_ROUTER_STAGE_TIMEOUT_SECONDS", "90"))
+    llm_adjudicator_stage_timeout_seconds: float = float(os.getenv("LLM_ADJUDICATOR_STAGE_TIMEOUT_SECONDS", "90"))
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     llm_http_retries: int = int(os.getenv("LLM_HTTP_RETRIES", "2"))
     llm_debug_raw_response: bool = _bool_env("LLM_DEBUG_RAW_RESPONSE", False)

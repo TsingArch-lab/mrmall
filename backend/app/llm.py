@@ -112,10 +112,14 @@ class Provider:
 class OpenAICompatibleProvider(Provider):
     """Provider exposing an OpenAI-compatible /chat/completions endpoint."""
 
+    def __init__(self, model_override: str | None = None, timeout_override: float | None = None):
+        self.model = (model_override or settings.llm_model).strip()
+        self.timeout_seconds = timeout_override or settings.llm_timeout_seconds
+
     async def _request(self, system: str, user: str, use_json_mode: bool = True) -> str:
         if not settings.llm_api_key:
             raise LLMError("LLM_API_KEY is missing")
-        if not settings.llm_model:
+        if not self.model:
             raise LLMError("LLM_MODEL is missing")
 
         url = f"{settings.llm_base_url}/chat/completions"
@@ -124,7 +128,7 @@ class OpenAICompatibleProvider(Provider):
             "Content-Type": "application/json",
         }
         payload: dict[str, Any] = {
-            "model": settings.llm_model,
+            "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -137,13 +141,13 @@ class OpenAICompatibleProvider(Provider):
         last_error: Exception | None = None
         for attempt in range(settings.llm_http_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                     resp = await client.post(url, headers=headers, json=payload)
 
                 # A provider may support OpenAI Chat Completions but not response_format.
                 if resp.status_code >= 400 and use_json_mode and resp.status_code in {400, 404, 422}:
                     payload.pop("response_format", None)
-                    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                    async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                         resp = await client.post(url, headers=headers, json=payload)
 
                 if resp.status_code in {408, 429, 500, 502, 503, 504} and attempt < settings.llm_http_retries:
@@ -221,10 +225,13 @@ class MockProvider(Provider):
         }
 
 
-def get_provider() -> Provider:
+def get_provider(*, secondary: bool = False) -> Provider:
     p = settings.llm_provider.lower().strip()
     if p == "mock":
         return MockProvider()
     if p in {"openai_compatible", "openai-compatible", "openai"}:
+        if secondary:
+            model = settings.llm_model_secondary.strip() or settings.llm_model
+            return OpenAICompatibleProvider(model_override=model, timeout_override=settings.llm_secondary_timeout_seconds)
         return OpenAICompatibleProvider()
     raise LLMError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")

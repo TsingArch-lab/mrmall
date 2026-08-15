@@ -14,3 +14,8 @@
 
 ## v0.1.5 Positive Evidence Layer
 “值得保留”由独立 Strength Extractor 生成：只使用已 PASS 的 strength-eligible Rules，并要求逐条绑定原文证据。正向反馈与 Gate/负面反馈完全解耦。
+
+
+## v0.1.6.2 Runtime Performance
+
+见 `RUNTIME_PERFORMANCE_v0.1.6.2.md`。本版本不修改 Rules 或 Gate。

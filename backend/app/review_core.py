@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .config import CORE_DIR, settings
 from .contracts import (
@@ -446,7 +447,7 @@ async def extract_strengths(
         },
     )
 
-    provider = get_provider()
+    provider = get_provider(secondary=True)
     try:
         raw = await provider.generate_json(
             "你是 STRENGTH_EXTRACTOR。只能从已 PASS 的指定 Rules 提取值得保留内容；No PASS Rule, No Strength。只输出 JSON。",
@@ -504,7 +505,7 @@ async def compose_feedback(
     if not clusters:
         return {"final_judgement":agg["final_judgement"],"dimension_assessments":agg["dimension_states"],"core_diagnosis":None,"issue_candidates":[],"strengths":[]}
 
-    provider = get_provider()
+    provider = get_provider(secondary=True)
     prompt = (PROMPTS / "02_feedback_composer.md").read_text(encoding="utf-8")
     user = _render(prompt, {"FINAL_JUDGEMENT":agg["final_judgement"],"DIMENSION_STATES":agg["dimension_states"],"FAILED_RULES_ONLY":failed,"FAILED_RULE_CLUSTERS":clusters,"VERIFICATION_RESULTS":verification_results,"PASSED_STRENGTH_CANDIDATES":[]})
     try:
@@ -530,8 +531,17 @@ def registry_hash():
     return load_json(REGISTRY).get("registry_semantic_hash", "unknown")
 
 
+def _emit_progress(progress_callback: Callable[[str, str], None] | None, stage: str, message: str) -> None:
+    if progress_callback:
+        try:
+            progress_callback(stage, message)
+        except Exception:
+            logger.debug("progress callback failed", exc_info=True)
+
+
 async def review_article(
-    article: str, content_type: str, verify_facts: bool = False
+    article: str, content_type: str, verify_facts: bool = False,
+    progress_callback: Callable[[str, str], None] | None = None,
 ):
     review_started = time.perf_counter()
     requested_type = content_type
@@ -542,10 +552,19 @@ async def review_article(
         verify_facts,
     )
 
+    _emit_progress(progress_callback, "STARTING", "正在准备审核")
+
     if content_type == "AUTO":
+        _emit_progress(progress_callback, "ROUTING", "正在判断文章类型")
         t0 = time.perf_counter()
         logger.info("[review] route_content_type start")
-        content_type = await route_content_type(article)
+        try:
+            content_type = await asyncio.wait_for(
+                route_content_type(article),
+                timeout=settings.llm_router_stage_timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise LLMError("自动判断文章类型超时。请手动选择 A/B/C/D/E 后重试。") from exc
         logger.info(
             "[review] route_content_type done elapsed=%.2fs resolved_type=%s",
             time.perf_counter() - t0,
@@ -560,9 +579,18 @@ async def review_article(
         "外部事实核验未执行；系统不得仅以‘无法核实/缺少来源’为理由触发事实类 FAIL。"
     )
 
+    _emit_progress(progress_callback, "EVALUATING", "正在执行规则审核")
     t0 = time.perf_counter()
     logger.info("[review] evaluate_rules start content_type=%s", content_type)
-    eval_result = await evaluate_rules(article, content_type, verification_context)
+    try:
+        eval_result = await asyncio.wait_for(
+            evaluate_rules(article, content_type, verification_context),
+            timeout=settings.llm_evaluator_stage_timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise LLMError(
+            f"Rule Evaluator 超过 {settings.llm_evaluator_stage_timeout_seconds:.0f} 秒仍未完成，本次审核安全中止。"
+        ) from exc
     logger.info(
         "[review] evaluate_rules done elapsed=%.2fs failed=%d unresolved=%d",
         time.perf_counter() - t0,
@@ -571,14 +599,25 @@ async def review_article(
     )
     validate_eval(eval_result, content_type)
 
+    if eval_result.get("unresolved_rules", []):
+        _emit_progress(progress_callback, "ADJUDICATING", "正在复核未决规则")
     t0 = time.perf_counter()
     logger.info(
         "[review] adjudicate_unresolved start unresolved=%d",
         len(eval_result.get("unresolved_rules", [])),
     )
-    eval_result = await adjudicate_unresolved(
-        article, content_type, eval_result, verification_context
-    )
+    if eval_result.get("unresolved_rules", []):
+        try:
+            eval_result = await asyncio.wait_for(
+                adjudicate_unresolved(article, content_type, eval_result, verification_context),
+                timeout=settings.llm_adjudicator_stage_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[review] adjudicate_unresolved timeout; preserving UNRESOLVED without blocking")
+    else:
+        eval_result = await adjudicate_unresolved(
+            article, content_type, eval_result, verification_context
+        )
     logger.info(
         "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d",
         time.perf_counter() - t0,
@@ -586,6 +625,7 @@ async def review_article(
     )
     validate_eval(eval_result, content_type)
 
+    _emit_progress(progress_callback, "AGGREGATING", "正在汇总规则结果")
     t0 = time.perf_counter()
     logger.info("[review] aggregate start")
     agg = aggregate(eval_result)
@@ -596,23 +636,44 @@ async def review_article(
         len(agg["failed_rule_ids"]),
     )
 
-    t0 = time.perf_counter()
-    logger.info("[review] extract_strengths start")
-    strengths = await extract_strengths(article, content_type, eval_result)
-    logger.info(
-        "[review] extract_strengths done elapsed=%.2fs strengths=%d",
-        time.perf_counter() - t0,
-        len(strengths),
-    )
+    # Strength extraction and feedback composition depend on the same completed Rule
+    # evaluation but not on each other. Run them concurrently. Both are non-gating:
+    # timeout/failure must never alter Rule results, Gate aggregation or final judgement.
+    secondary_timeout = settings.llm_secondary_timeout_seconds
 
+    async def _strength_stage():
+        t = time.perf_counter()
+        logger.info("[review] extract_strengths start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
+        try:
+            value = await asyncio.wait_for(
+                extract_strengths(article, content_type, eval_result),
+                timeout=secondary_timeout + 5,
+            )
+            logger.info("[review] extract_strengths done elapsed=%.2fs strengths=%d", time.perf_counter() - t, len(value))
+            return value
+        except Exception as exc:
+            logger.warning("[review] extract_strengths degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            return []
+
+    async def _feedback_stage():
+        t = time.perf_counter()
+        logger.info("[review] compose_feedback start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
+        try:
+            value = await asyncio.wait_for(
+                compose_feedback(eval_result, agg, verification_context.results),
+                timeout=secondary_timeout + 5,
+            )
+            logger.info("[review] compose_feedback done elapsed=%.2fs issues=%d", time.perf_counter() - t, len(value.get("issue_candidates", [])))
+            return value
+        except Exception as exc:
+            logger.warning("[review] compose_feedback degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            return deterministic_feedback_fallback(eval_result, agg)
+
+    _emit_progress(progress_callback, "POSTPROCESSING", "正在整理问题清单与值得保留")
     t0 = time.perf_counter()
-    logger.info("[review] compose_feedback start")
-    feedback = await compose_feedback(eval_result, agg, verification_context.results)
-    logger.info(
-        "[review] compose_feedback done elapsed=%.2fs issues=%d",
-        time.perf_counter() - t0,
-        len(feedback.get("issue_candidates", [])),
-    )
+    logger.info("[review] postprocess_parallel start")
+    strengths, feedback = await asyncio.gather(_strength_stage(), _feedback_stage())
+    logger.info("[review] postprocess_parallel done elapsed=%.2fs", time.perf_counter() - t0)
 
     # Positive feedback is produced by its own PASS-grounded extractor, never by the
     # negative Feedback Composer. It cannot change Gate/final judgement.
@@ -637,6 +698,7 @@ async def review_article(
         "verification_note": verification_note,
     }
 
+    _emit_progress(progress_callback, "COMPLETED", "审核完成")
     logger.info(
         "[review] complete elapsed=%.2fs final=%s issues=%d strengths=%d",
         time.perf_counter() - review_started,

@@ -1,4 +1,4 @@
-const APP_VERSION='0.1.6.1';
+const APP_VERSION='0.1.6.2';
 const $ = (id) => document.getElementById(id);
 const apiInput = $('apiBase');
 apiInput.value = localStorage.getItem('mall_api_base') || 'http://localhost:8000';
@@ -13,27 +13,48 @@ $('reviewBtn').addEventListener('click', async () => {
   localStorage.setItem('mall_api_base', base);
   localStorage.setItem('mall_access_token', tokenInput.value.trim());
   $('reviewBtn').disabled = true;
-  $('status').textContent = '正在执行 Rules…';
+  const startedAt=Date.now();
+  const headers=Object.assign({'Content-Type':'application/json'}, tokenInput.value.trim() ? {'Authorization':'Bearer '+tokenInput.value.trim()} : {});
+  const stageText={
+    QUEUED:'正在排队', STARTING:'正在准备审核', ROUTING:'正在判断文章类型',
+    EVALUATING:'正在执行规则审核', ADJUDICATING:'正在复核未决规则',
+    AGGREGATING:'正在汇总规则结果', POSTPROCESSING:'正在整理问题清单与值得保留',
+    COMPLETED:'审核完成', FAILED:'审核失败'
+  };
   try {
-    const resp = await fetch(base + '/api/review', {
-      method: 'POST',
-      headers: Object.assign({'Content-Type':'application/json'}, tokenInput.value.trim() ? {'Authorization':'Bearer '+tokenInput.value.trim()} : {}),
-      body: JSON.stringify({article, content_type:$('contentType').value, verify_facts:false})
+    const createResp=await fetch(base + '/api/review/jobs', {
+      method:'POST', headers,
+      body:JSON.stringify({article, content_type:$('contentType').value, verify_facts:false})
     });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const detail = data && data.detail ? data.detail : ('HTTP ' + resp.status + ' 审核失败');
-      throw new Error(detail);
+    const created=await createResp.json();
+    if(!createResp.ok) throw new Error(created && created.detail ? created.detail : ('HTTP '+createResp.status+' 创建审核任务失败'));
+    const jobId=created.job_id;
+    $('status').textContent='审核任务已创建…';
+
+    while(true){
+      await sleep(2000);
+      const poll=await fetch(base + '/api/review/jobs/' + encodeURIComponent(jobId), {headers});
+      const state=await poll.json();
+      if(!poll.ok) throw new Error(state && state.detail ? state.detail : ('HTTP '+poll.status+' 查询审核任务失败'));
+      const sec=Math.floor((Date.now()-startedAt)/1000);
+      $('status').textContent=`${stageText[state.stage]||state.message||'正在审核'}… ${sec}秒`;
+      if(state.status==='completed'){
+        render(state.result);
+        $('status').textContent=`完成 · ${sec}秒`;
+        break;
+      }
+      if(state.status==='failed') throw new Error(state.message||'审核失败');
     }
-    render(data);
-    $('status').textContent = '完成';
   } catch (e) {
     $('status').textContent = '失败';
-    alert(e.message);
+    const msg=(e && e.message==='Failed to fetch') ? '暂时无法连接审核服务。请确认 Render 服务正常后重试。' : e.message;
+    alert(msg);
   } finally {
     $('reviewBtn').disabled = false;
   }
 });
+
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
 function render(d){
   $('result').classList.remove('hidden');
