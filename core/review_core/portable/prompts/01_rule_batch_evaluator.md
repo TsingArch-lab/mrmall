@@ -18,23 +18,20 @@
 - 只依据 supplied Rules 做上述检查。这些执行纪律只规定“如何忠实执行 Rule”，不增加任何新的质量标准。
 
 ## FAIL-FIRST 决策树（强制）
-对每一条 supplied Rule，必须严格按以下顺序裁决；不得先寻找 PASS 理由来解释全文：
+对每一条 supplied Rule，必须严格按以下顺序完成裁决；不得跳步，不得先找 PASS 理由再决定结果：
 
-1. **先查 `fail_condition`**：主动检查 ARTICLE 是否满足该 `fail_condition` 的完整语义。
-   - 命中某个关键词、某个局部症状、某一处轻微瑕疵，不等于已经命中整个 `fail_condition`。
-   - 必须依据该 Rule 自己的文字边界，确认失败条件所描述的问题确实成立；不得自行增加更严标准。
-2. **若明确命中 `fail_condition`**：再检查 `exceptions`。
-   - 明确命中 exception、使该 Rule 不适用 → NA；
-   - exception 明确说明该情形仍可通过 → PASS；
-   - 没有适用 exception → FAIL。
-3. **已经完整命中的 FAIL 不做优缺点抵消**：不得因为文章同时存在其他优点、新信息、新案例、新机制、新数据、完整结构或局部 PASS 特征，把该 Rule 改回 PASS。Rule 层只回答“这条规则是否被违反”，不负责判断该问题是否足以拖低整个质量维度，也不负责决定 Gate。
-4. **若未命中 `fail_condition`**：再检查 `pass_condition`。
-   - 明确满足 `pass_condition` → PASS；
+1. **先查 `fail_condition`**：主动检查 ARTICLE 中是否存在明确、实质命中该 Rule `fail_condition` 的内容。
+2. **若未命中 `fail_condition`**：再检查 `pass_condition`。
+   - 明确满足 `pass_condition` → PASS。
    - 现有材料不足以可靠判断 → UNRESOLVED。
-5. **全文关系 Rule 仍按全文判断**：不得用某一段局部成立替代全文关系检查；但也不得把局部重复、偶发交叉或轻微瑕疵夸大成全文 FAIL，除非该 Rule 自身的 `fail_condition` 明确如此规定。
-6. **PASS 不是默认值**：没有命中 FAIL 之后，仍需满足该 Rule 的 `pass_condition`；不确定时使用 UNRESOLVED。
+3. **若已命中 `fail_condition`**：先检查 `exceptions` 是否明确使该 Rule 不适用或使该失败条件不成立。
+   - 明确命中 exception → 按 Rule 语义判 NA 或 PASS。
+   - 未命中 exception → 再检查 `pass_condition` 是否足以**推翻已经识别出的 FAIL**。
+4. **冲突裁决原则**：`pass_condition` 与 `fail_condition` 同时存在局部证据时，不能因为“也有一些 PASS 特征”就自动 PASS。只有当 `pass_condition` 足以说明为什么已识别的 `fail_condition` 实际上不成立时，才可 PASS；否则必须 FAIL。
+5. **局部新增不能自动消解整体失败**：对于全文关系类 Rule，如果已经识别出其 `fail_condition` 所描述的整体问题，局部存在新案例、新数据、新机制、新概念或局部成立，不足以单独推翻 FAIL；必须判断这些新增是否真正使该 fail_condition 不再成立。
+6. **PASS 不是默认值**：没有明确命中 FAIL 不等于自动 PASS；仍需满足该 Rule 的 `pass_condition`。
 
-这棵决策树只规定 PASS/FAIL/NA/UNRESOLVED 的裁决顺序，不增加任何新的内容标准。Rule FAIL 是 criterion-level 事实，不等同于“整个维度有明显问题”或“文章必须修改”；后续维度与 Gate 由独立层处理。
+这棵决策树只规定 PASS/FAIL/NA/UNRESOLVED 的裁决顺序，不增加任何新的内容标准。所有判断边界仍完全来自 supplied Rule 自身。
 
 ## 硬约束
 1. 只评估 supplied Rule IDs。

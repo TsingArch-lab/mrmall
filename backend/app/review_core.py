@@ -60,6 +60,12 @@ DIM_MAP = {
     "FINAL": "表达质量",
 }
 
+# FINAL meta rules are deterministic summaries of upstream execution state, not fresh
+# article judgements. They are derived after model evaluation and never shown as
+# standalone author-facing problems or dimension evidence.
+DERIVED_META_RULE_IDS = {"F001", "F002"}
+FIXED_DIMENSIONS = ["选题价值", "证据支撑", "观点质量", "结构逻辑", "表达质量"]
+
 
 def load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -90,6 +96,10 @@ def applicable_rule_ids(content_type: str):
     return final
 
 
+def model_rule_ids(content_type: str):
+    return [rid for rid in applicable_rule_ids(content_type) if rid not in DERIVED_META_RULE_IDS]
+
+
 def compact_rules(content_type: str):
     reg = rules_by_id()
     keys = [
@@ -102,11 +112,11 @@ def compact_rules(content_type: str):
         "fail_condition",
         "exceptions",
     ]
-    return [{k: reg[rid].get(k) for k in keys} for rid in applicable_rule_ids(content_type)]
+    return [{k: reg[rid].get(k) for k in keys} for rid in model_rule_ids(content_type)]
 
 
-def validate_eval(result: dict[str, Any], content_type: str):
-    supplied = set(applicable_rule_ids(content_type))
+def validate_eval(result: dict[str, Any], content_type: str, *, allow_derived_missing: bool = False):
+    supplied = set(model_rule_ids(content_type) if allow_derived_missing else applicable_rule_ids(content_type))
     buckets = []
     buckets += result.get("passed_rule_ids", [])
     buckets += result.get("na_rule_ids", [])
@@ -367,51 +377,63 @@ async def adjudicate_unresolved(
     return eval_result
 
 
-def aggregate(eval_result: dict[str, Any]):
-    """Deterministic Gate aggregation only.
+def _remove_rule_from_buckets(eval_result: dict[str, Any], rule_id: str) -> None:
+    eval_result["passed_rule_ids"] = [x for x in eval_result.get("passed_rule_ids", []) if x != rule_id]
+    eval_result["na_rule_ids"] = [x for x in eval_result.get("na_rule_ids", []) if x != rule_id]
+    eval_result["failed_rules"] = [x for x in eval_result.get("failed_rules", []) if x.get("rule_id") != rule_id]
+    eval_result["unresolved_rules"] = [x for x in eval_result.get("unresolved_rules", []) if x.get("rule_id") != rule_id]
 
-    Important: a Rule FAIL is a local/criterion-level judgement. It must NOT
-    automatically downgrade the whole author-facing quality dimension. Dimension
-    impact is assessed separately downstream, using only already-validated FAIL Rules.
+
+def derive_meta_rules(eval_result: dict[str, Any], content_type: str) -> dict[str, Any]:
+    """Derive FINAL meta rules without asking the model to re-judge the article.
+
+    F001 means "an upstream BLOCKER remains" and therefore mirrors already-confirmed
+    upstream BLOCKER FAILs. F002 verifies severity execution; runtime severity is read
+    directly from the registry, so a successfully normalized evaluation passes F002.
     """
+    applicable = set(applicable_rule_ids(content_type))
     reg = rules_by_id()
-    fails = eval_result.get("failed_rules", [])
-    fail_ids = [x["rule_id"] for x in fails]
-    by_stage: dict[str, list[dict[str, Any]]] = {}
-    for rid in fail_ids:
-        r = reg[rid]
-        by_stage.setdefault(r["stage"], []).append(r)
+    for rid in DERIVED_META_RULE_IDS:
+        _remove_rule_from_buckets(eval_result, rid)
 
-    revise = False
-    if any(reg[rid]["severity"] == "BLOCKER" for rid in fail_ids):
-        revise = True
-    if eval_result["content_type"] in {"A", "B"} and len(by_stage.get("TOPIC", [])) >= 2:
-        revise = True
-    for stage in ["STRUCTURE", "FINAL"]:
-        if sum(1 for r in by_stage.get(stage, []) if r["severity"] == "MAJOR") >= 3:
-            revise = True
+    upstream_blockers = []
+    for item in eval_result.get("failed_rules", []):
+        rid = item.get("rule_id")
+        rule = reg.get(rid, {})
+        if rid not in DERIVED_META_RULE_IDS and rule.get("severity") == "BLOCKER" and rule.get("stage") != "FINAL":
+            upstream_blockers.append(item)
 
-    final = "需要修改" if revise else "可以继续"
+    if "F001" in applicable:
+        if upstream_blockers:
+            evidence = []
+            for item in upstream_blockers:
+                for ev in item.get("article_evidence", []):
+                    if ev and ev not in evidence:
+                        evidence.append(ev)
+            eval_result.setdefault("failed_rules", []).append({
+                "rule_id": "F001",
+                "article_evidence": evidence[:6] or ["上游 BLOCKER 已由现有 Rule 结果确认。"],
+                "match_explanation": "存在未解决的上游 BLOCKER：" + ", ".join(x.get("rule_id", "") for x in upstream_blockers),
+            })
+        else:
+            eval_result.setdefault("passed_rule_ids", []).append("F001")
 
-    # Neutral baseline only. These are NOT inferred from PASS/FAIL here.
-    # The Feedback/Dimension stage may downgrade a dimension only when validated
-    # FAIL Rules mapped to that dimension have material whole-dimension impact.
-    dims = {
-        k: "达标"
-        for k in ["选题价值", "证据支撑", "观点质量", "结构逻辑", "表达质量"]
-    }
-    return {
-        "final_judgement": final,
-        "dimension_states": dims,
-        "failed_rule_ids": fail_ids,
-    }
+    if "F002" in applicable:
+        eval_result.setdefault("passed_rule_ids", []).append("F002")
+
+    eval_result["evaluated_rule_ids"] = list(applicable_rule_ids(content_type))
+    return eval_result
+
+
+def user_facing_failed_rules(eval_result: dict[str, Any]) -> list[dict[str, Any]]:
+    return [x for x in eval_result.get("failed_rules", []) if x.get("rule_id") not in DERIVED_META_RULE_IDS]
 
 
 def dimension_fail_context(eval_result: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build provenance for dimension impact assessment from FAIL Rules only."""
+    """Build dimension provenance from confirmed non-meta FAIL Rules only."""
     reg = rules_by_id()
     out: list[dict[str, Any]] = []
-    for item in eval_result.get("failed_rules", []):
+    for item in user_facing_failed_rules(eval_result):
         rid = item.get("rule_id")
         rule = reg.get(rid, {})
         dim = DIM_MAP.get(rule.get("stage"))
@@ -423,112 +445,135 @@ def dimension_fail_context(eval_result: dict[str, Any]) -> list[dict[str, Any]]:
             "stage": rule.get("stage"),
             "dimension": dim,
             "severity": rule.get("severity"),
+            "fail_condition": rule.get("fail_condition"),
             "article_evidence": item.get("article_evidence", []),
             "match_explanation": item.get("match_explanation", ""),
         })
     return out
 
 
-def validate_feedback(
-    feedback: dict[str, Any],
-    eval_result: dict[str, Any],
-    expected_final: str,
-):
-    failed = {x["rule_id"] for x in eval_result.get("failed_rules", [])}
+def deterministic_dimension_fallback(eval_result: dict[str, Any]) -> dict[str, Any]:
+    """Conservative fail-safe when the secondary Dimension Evaluator is unavailable."""
+    dims = {k: "达标" for k in FIXED_DIMENSIONS}
+    ctx = dimension_fail_context(eval_result)
+    by_dim: dict[str, list[dict[str, Any]]] = {}
+    for item in ctx:
+        by_dim.setdefault(item["dimension"], []).append(item)
+    for dim, items in by_dim.items():
+        if any(x.get("severity") == "BLOCKER" for x in items):
+            dims[dim] = "有明显问题"
+        elif sum(1 for x in items if x.get("severity") == "MAJOR") >= 2:
+            dims[dim] = "有明显问题"
+    return {
+        "dimension_states": dims,
+        "final_judgement": "需要修改" if "有明显问题" in dims.values() else "可以继续",
+        "dimension_reasons": {},
+    }
 
-    if feedback.get("final_judgement") != expected_final:
-        raise ValueError("Feedback Composer attempted to change deterministic final_judgement")
 
-    # Dimension impact is a separate layer from Rule FAIL and Gate. It may only
-    # downgrade a dimension that has at least one validated FAIL Rule mapped to it.
-    expected_dims = ["选题价值", "证据支撑", "观点质量", "结构逻辑", "表达质量"]
-    dims = feedback.get("dimension_assessments", {})
-    if set(dims.keys()) != set(expected_dims):
-        raise ValueError("dimension_assessments must contain exactly the five fixed dimensions")
+def validate_dimension_result(raw: dict[str, Any], eval_result: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("Dimension Evaluator output must be an object")
+    dims = raw.get("dimension_states")
+    if not isinstance(dims, dict) or set(dims.keys()) != set(FIXED_DIMENSIONS):
+        raise ValueError("dimension_states must contain exactly the five fixed dimensions")
     if any(v not in {"达标", "有明显问题"} for v in dims.values()):
-        raise ValueError("dimension_assessments contains unsupported state")
+        raise ValueError("dimension_states contains unsupported state")
 
-    mapped_failed_dims = {x["dimension"] for x in dimension_fail_context(eval_result)}
-    for dim, state in dims.items():
-        if state == "有明显问题" and dim not in mapped_failed_dims:
-            raise ValueError(
-                f"Dimension provenance violation: {dim} downgraded without a mapped FAIL Rule"
-            )
+    ctx = dimension_fail_context(eval_result)
+    mapped_dims = {x["dimension"] for x in ctx}
+    blocker_dims = {x["dimension"] for x in ctx if x.get("severity") == "BLOCKER"}
+    for dim in FIXED_DIMENSIONS:
+        if dim not in mapped_dims and dims[dim] != "达标":
+            raise ValueError(f"Dimension provenance violation: {dim} has no mapped FAIL Rule")
+        if dim in blocker_dims:
+            # BLOCKER is no longer a direct Gate trigger. It is a mandatory dimension
+            # failure signal, which then deterministically produces the release state.
+            dims[dim] = "有明显问题"
 
-    core = feedback.get("core_diagnosis")
-    issues = feedback.get("issue_candidates", [])
-    negative = ([core] if core else []) + issues
-
-    if not failed and negative:
-        raise ValueError(
-            "No Rule, No Feedback violation: negative feedback exists with zero FAIL Rules"
-        )
-
-    for item in negative:
-        if not isinstance(item, dict):
-            raise ValueError("Feedback negative item must be an object")
-        support = set(item.get("supporting_rule_ids", []))
-        if not support or not support.issubset(failed):
-            raise ValueError(
-                f"Feedback provenance violation: {support} is not subset of FAIL Rules {failed}"
-            )
-        evidence = item.get("article_evidence", [])
-        if not isinstance(evidence, list) or not evidence:
-            raise ValueError("Feedback item missing article evidence")
-        if not isinstance(item.get("text"), str) or not item["text"].strip():
-            raise ValueError("Feedback item missing text")
+    final = "需要修改" if "有明显问题" in dims.values() else "可以继续"
+    reasons = raw.get("dimension_reasons", {})
+    if not isinstance(reasons, dict):
+        reasons = {}
+    return {"dimension_states": dims, "final_judgement": final, "dimension_reasons": reasons}
 
 
-def deterministic_feedback_fallback(
-    eval_result: dict[str, Any],
-    agg: dict[str, Any],
-) -> dict[str, Any]:
-    """Fail-safe author feedback using only validated FAIL Rule payloads.
+async def evaluate_dimensions_and_gate(article: str, content_type: str, eval_result: dict[str, Any]) -> dict[str, Any]:
+    """Dimension is the quality judge; Gate is only the deterministic release switch."""
+    ctx = dimension_fail_context(eval_result)
+    if not ctx:
+        dims = {k: "达标" for k in FIXED_DIMENSIONS}
+        return {"dimension_states": dims, "final_judgement": "可以继续", "dimension_reasons": {}}
 
-    This keeps the site usable if a provider cannot follow the Feedback JSON contract,
-    without allowing the program to invent new editorial standards.
-    """
-    failed = eval_result.get("failed_rules", [])
+    prompt_path = PROMPTS / "06_dimension_gate_evaluator.md"
+    prompt = prompt_path.read_text(encoding="utf-8")
+    user = _render(prompt, {
+        "CONTENT_TYPE": content_type,
+        "DIMENSION_FAIL_CONTEXT": ctx,
+        "ARTICLE": article,
+    })
+    provider = get_provider(secondary=True)
+    raw = await provider.generate_json(
+        "你是 DIMENSION_EVALUATOR。你只能判断已确认 FAIL 对五维成稿质量的影响；不得重新判 Rule，不得新增问题。BLOCKER 必须使其对应维度为有明显问题。只输出指定 JSON。",
+        user,
+    )
+    return validate_dimension_result(raw, eval_result)
+
+
+def _valid_negative_item(item: Any, failed_ids: set[str], article: str) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    text = str(item.get("text", "")).strip()
+    support = [str(x).strip() for x in item.get("supporting_rule_ids", []) if str(x).strip()]
+    evidence = [str(x).strip() for x in item.get("article_evidence", []) if str(x).strip()]
+    if not text or not support or not evidence:
+        return None
+    if not set(support).issubset(failed_ids):
+        return None
+    if any(ev not in article for ev in evidence):
+        return None
+    return {"text": text, "supporting_rule_ids": list(dict.fromkeys(support)), "article_evidence": evidence}
+
+def deterministic_feedback_fallback(eval_result: dict[str, Any]) -> dict[str, Any]:
+    """Clustered fail-safe using only confirmed FAIL provenance."""
+    failed = user_facing_failed_rules(eval_result)
     if not failed:
-        return {
-            "final_judgement": agg["final_judgement"],
-            "dimension_assessments": agg["dimension_states"],
-            "core_diagnosis": None,
-            "issue_candidates": [],
-            "strengths": [],
-        }
+        return {"core_diagnosis": None, "issue_candidates": []}
 
     reg = rules_by_id()
-    severity_order = {"BLOCKER": 0, "MAJOR": 1, "MINOR": 2, "INFO": 3, "NA": 4}
-    ordered = sorted(
-        failed,
-        key=lambda x: severity_order.get(reg[x["rule_id"]].get("severity", "INFO"), 9),
-    )
+    clusters = cluster_failed_rules(failed, reg)
+    issues: list[dict[str, Any]] = []
+    for c in clusters:
+        ids = [rid for rid in c.get("supporting_rule_ids", []) if rid not in DERIVED_META_RULE_IDS]
+        if not ids:
+            continue
+        ev = [x for x in c.get("article_evidence", []) if x]
+        if len(ids) == 1:
+            rid = ids[0]
+            f = next((x for x in failed if x.get("rule_id") == rid), None)
+            if not f:
+                continue
+            text = f"{reg[rid]['name']}：{f.get('match_explanation', '')}"
+            ev = f.get("article_evidence", []) or ev
+        else:
+            text = f"{c.get('cluster_hint', '同源问题')}：多个已 FAIL Rules 指向同一上游问题。"
+        if ev:
+            issues.append({"text": text, "supporting_rule_ids": ids, "article_evidence": ev})
 
-    issues = []
-    for item in ordered:
-        rid = item["rule_id"]
-        rule = reg[rid]
-        issues.append(
-            {
-                "text": f"{rule['name']}：{item['match_explanation']}",
-                "supporting_rule_ids": [rid],
-                "article_evidence": item["article_evidence"],
-            }
-        )
+    if not issues:
+        # Last-resort deterministic rendering. This is only used when clustering itself
+        # returns unusable data; it never invents a new editorial criterion.
+        for f in failed:
+            rid = f.get("rule_id")
+            ev = f.get("article_evidence", [])
+            if rid and ev:
+                issues.append({
+                    "text": f"{reg[rid]['name']}：{f.get('match_explanation', '')}",
+                    "supporting_rule_ids": [rid],
+                    "article_evidence": ev,
+                })
 
-    first = issues[0]
-    return {
-        "final_judgement": agg["final_judgement"],
-        "dimension_assessments": agg["dimension_states"],
-        "core_diagnosis": {
-            "text": first["text"],
-            "supporting_rule_ids": first["supporting_rule_ids"],
-            "article_evidence": first["article_evidence"],
-        },
-        "issue_candidates": issues,
-        "strengths": [],
-    }
+    return {"core_diagnosis": issues[0] if issues else None, "issue_candidates": issues}
 
 
 async def extract_strengths(
@@ -536,11 +581,7 @@ async def extract_strengths(
     content_type: str,
     eval_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Extract positive author feedback from selected PASS Rules only.
-
-    This is intentionally separate from negative feedback composition so a model cannot
-    turn free-form praise into a new editorial standard or influence Gate results.
-    """
+    """Extract positive author feedback from selected PASS Rules only."""
     passed = [
         rid for rid in eval_result.get("passed_rule_ids", [])
         if rid in STRENGTH_ELIGIBLE_RULE_IDS
@@ -588,13 +629,8 @@ async def extract_strengths(
                 continue
             if not set(support).issubset(passed_set):
                 continue
-            # PASS is necessary but not sufficient: at least one supporting Rule must be
-            # an anchor capable of representing a distinctive content asset. Evidence-only
-            # or merely "no-error" PASS states cannot generate praise.
             if not (set(support) & STRENGTH_ANCHOR_RULE_IDS):
                 continue
-            # Positive provenance is stricter than negative prose: every cited excerpt
-            # must literally occur in the submitted article after trimming.
             if any(ev not in article for ev in evidence):
                 continue
             out.append({
@@ -608,55 +644,51 @@ async def extract_strengths(
         return []
 
 
-async def compose_feedback(
-    eval_result: dict[str, Any],
-    agg: dict[str, Any],
-    verification_results: list[dict[str, Any]],
-):
-    failed = eval_result.get("failed_rules", [])
+async def compose_feedback(article: str, eval_result: dict[str, Any], verification_results: list[dict[str, Any]]):
+    """Problem clusterer only. It cannot judge dimensions or release state."""
+    failed = user_facing_failed_rules(eval_result)
     if not failed:
-        return deterministic_feedback_fallback(eval_result, agg)
+        return {"core_diagnosis": None, "issue_candidates": []}
 
     reg = rules_by_id()
     clusters = cluster_failed_rules(failed, reg)
     if not clusters:
-        return {"final_judgement":agg["final_judgement"],"dimension_assessments":agg["dimension_states"],"core_diagnosis":None,"issue_candidates":[],"strengths":[]}
+        return deterministic_feedback_fallback(eval_result)
 
     provider = get_provider(secondary=True)
     prompt = (PROMPTS / "02_feedback_composer.md").read_text(encoding="utf-8")
-    dim_fail_context = dimension_fail_context(eval_result)
     user = _render(prompt, {
-        "FINAL_JUDGEMENT": agg["final_judgement"],
-        "DIMENSION_STATES": agg["dimension_states"],
-        "DIMENSION_FAIL_CONTEXT": dim_fail_context,
         "FAILED_RULES_ONLY": failed,
         "FAILED_RULE_CLUSTERS": clusters,
         "VERIFICATION_RESULTS": verification_results,
-        "PASSED_STRENGTH_CANDIDATES": [],
+        "ARTICLE": article,
     })
     try:
         raw = await provider.generate_json(
-            "你是 FEEDBACK_COMPOSER_AND_DIMENSION_ASSESSOR。不得新增审稿标准；不得修改程序最终判断。"
-            "Rule FAIL 只表示具体规则被违反，不自动等于整个维度有明显问题。"
-            "五维只能依据已验证 FAIL Rules 的影响范围做二次聚合；没有对应 FAIL Rule 的维度必须保持达标。"
-            "作者端优先按 FAILED_RULE_CLUSTERS 合并同源问题；不得一 Rule 一问题；不得把 Gate 后果、severity 或 BLOCKER 本身写成独立问题。",
+            "你是 PROBLEM_CLUSTERER。只能把已 FAIL Rules 聚合成同源作者问题。不得判断五维、不得判断是否发布、不得新增审稿标准。只输出指定 JSON。",
             user,
         )
-        feedback = normalize_feedback(raw)
-        feedback["final_judgement"] = agg["final_judgement"]
-        validate_feedback(feedback, eval_result, agg["final_judgement"])
-        return feedback
+        failed_ids = {x.get("rule_id") for x in failed if x.get("rule_id")}
+        raw_issues = raw.get("issue_candidates", []) if isinstance(raw, dict) else []
+        issues: list[dict[str, Any]] = []
+        if isinstance(raw_issues, list):
+            for item in raw_issues:
+                valid = _valid_negative_item(item, failed_ids, article)
+                if valid:
+                    issues.append(valid)
+
+        core = _valid_negative_item(raw.get("core_diagnosis"), failed_ids, article) if isinstance(raw, dict) else None
+        if core is None and issues:
+            core = issues[0]
+
+        # Item-level tolerance: malformed items are discarded, not a reason to reject
+        # the entire response. If nothing valid remains, use deterministic clustering.
+        if not issues:
+            return deterministic_feedback_fallback(eval_result)
+        return {"core_diagnosis": core, "issue_candidates": issues}
     except Exception as exc:
-        logger.warning("Feedback Composer failed; clustered fallback: %s", exc)
-        issues=[]
-        for c in clusters:
-            ids=c["supporting_rule_ids"]; ev=c["article_evidence"]
-            if len(ids)==1:
-                rid=ids[0]; f=next(x for x in failed if x["rule_id"]==rid); text=f"{reg[rid]['name']}：{f['match_explanation']}"
-            else:
-                text=f"{c['cluster_hint']}：多个已 FAIL Rules 指向同一上游问题。"
-            issues.append({"text":text,"supporting_rule_ids":ids,"article_evidence":ev})
-        return {"final_judgement":agg["final_judgement"],"dimension_assessments":agg["dimension_states"],"core_diagnosis":issues[0] if issues else None,"issue_candidates":issues,"strengths":[]}
+        logger.warning("Problem Clusterer failed; clustered fallback: %s", exc)
+        return deterministic_feedback_fallback(eval_result)
 
 def registry_hash():
     return load_json(REGISTRY).get("registry_semantic_hash", "unknown")
@@ -774,7 +806,7 @@ async def review_article(
             verification_note = "事实搜索发生异常，本次审核已自动降级为未联网核验；不会因为搜索失败判文章事实错误。"
 
     verification_context = make_verification_context(verify_facts, verification_results, state=verification_state)
-    validate_eval(eval_result, content_type)
+    validate_eval(eval_result, content_type, allow_derived_missing=True)
 
     # Only adverse, high-impact search findings trigger a small targeted recheck.
     fact_rule_ids = [rid for rid in FACT_SENSITIVE_RULE_IDS if rid in applicable_rule_ids(content_type)]
@@ -794,7 +826,7 @@ async def review_article(
     elif verify_facts:
         logger.info("[review] fact_sensitive_recheck skipped: no material adverse verification signal")
 
-    validate_eval(eval_result, content_type)
+    validate_eval(eval_result, content_type, allow_derived_missing=True)
 
     if eval_result.get("unresolved_rules", []):
         _emit_progress(progress_callback, "ADJUDICATING", "正在复核未决规则")
@@ -816,26 +848,27 @@ async def review_article(
             article, content_type, eval_result, verification_context
         )
     logger.info(
-        "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d",
+        "[review] adjudicate_unresolved done elapsed=%.2fs unresolved=%d failed_ids=%s unresolved_ids=%s",
         time.perf_counter() - t0,
         len(eval_result.get("unresolved_rules", [])),
+        [x.get("rule_id") for x in eval_result.get("failed_rules", [])],
+        [x.get("rule_id") for x in eval_result.get("unresolved_rules", [])],
     )
+    validate_eval(eval_result, content_type, allow_derived_missing=True)
+
+    # FINAL meta rules are derived from the already-confirmed Rule state. They never
+    # get a fresh model judgement and never create standalone author feedback.
+    eval_result = derive_meta_rules(eval_result, content_type)
     validate_eval(eval_result, content_type)
-
-    _emit_progress(progress_callback, "AGGREGATING", "正在汇总规则结果")
-    t0 = time.perf_counter()
-    logger.info("[review] aggregate start")
-    agg = aggregate(eval_result)
     logger.info(
-        "[review] aggregate done elapsed=%.2fs final=%s failed=%d",
-        time.perf_counter() - t0,
-        agg["final_judgement"],
-        len(agg["failed_rule_ids"]),
+        "[review] rule_results final failed_ids=%s unresolved_ids=%s",
+        [x.get("rule_id") for x in eval_result.get("failed_rules", [])],
+        [x.get("rule_id") for x in eval_result.get("unresolved_rules", [])],
     )
 
-    # Strength extraction and feedback composition depend on the same completed Rule
-    # evaluation but not on each other. Run them concurrently. Both are non-gating:
-    # timeout/failure must never alter Rule results, Gate aggregation or final judgement.
+    # After Rule FAIL is finalized, three independent downstream tasks run in parallel:
+    # 1) cluster same-source author problems; 2) assess dimension impact and derive the
+    # release state; 3) extract strengths. No downstream task may alter Rule results.
     secondary_timeout = settings.llm_secondary_timeout_seconds
 
     async def _strength_stage():
@@ -854,28 +887,63 @@ async def review_article(
 
     async def _feedback_stage():
         t = time.perf_counter()
-        logger.info("[review] compose_feedback start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
+        logger.info("[review] problem_clusterer start model=%s timeout=%.0fs", settings.llm_model_secondary or settings.llm_model, secondary_timeout)
         try:
             value = await asyncio.wait_for(
-                compose_feedback(eval_result, agg, verification_context.results),
+                compose_feedback(article, eval_result, verification_context.results),
                 timeout=secondary_timeout + 5,
             )
-            logger.info("[review] compose_feedback done elapsed=%.2fs issues=%d", time.perf_counter() - t, len(value.get("issue_candidates", [])))
+            logger.info("[review] problem_clusterer done elapsed=%.2fs issues=%d", time.perf_counter() - t, len(value.get("issue_candidates", [])))
             return value
         except Exception as exc:
-            logger.warning("[review] compose_feedback degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
-            return deterministic_feedback_fallback(eval_result, agg)
+            logger.warning("[review] problem_clusterer degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            return deterministic_feedback_fallback(eval_result)
 
-    _emit_progress(progress_callback, "POSTPROCESSING", "正在整理问题清单与值得保留")
+    async def _dimension_stage():
+        t = time.perf_counter()
+        ctx = dimension_fail_context(eval_result)
+        logger.info(
+            "[review] dimension_gate start model=%s timeout=%.0fs input_failed_ids=%s",
+            settings.llm_model_secondary or settings.llm_model,
+            secondary_timeout,
+            [x.get("rule_id") for x in ctx],
+        )
+        try:
+            value = await asyncio.wait_for(
+                evaluate_dimensions_and_gate(article, content_type, eval_result),
+                timeout=secondary_timeout + 5,
+            )
+            logger.info(
+                "[review] dimension_gate done elapsed=%.2fs final=%s states=%s",
+                time.perf_counter() - t,
+                value.get("final_judgement"),
+                value.get("dimension_states"),
+            )
+            return value
+        except Exception as exc:
+            logger.warning("[review] dimension_gate degraded elapsed=%.2fs error=%s", time.perf_counter() - t, exc)
+            value = deterministic_dimension_fallback(eval_result)
+            logger.info("[review] dimension_gate fallback final=%s states=%s", value["final_judgement"], value["dimension_states"])
+            return value
+
+    _emit_progress(progress_callback, "POSTPROCESSING", "正在并行整理问题、判断五维与提取值得保留")
     t0 = time.perf_counter()
     logger.info("[review] postprocess_parallel start")
-    strengths, feedback = await asyncio.gather(_strength_stage(), _feedback_stage())
+    strengths, feedback, dimension_result = await asyncio.gather(
+        _strength_stage(), _feedback_stage(), _dimension_stage()
+    )
     logger.info("[review] postprocess_parallel done elapsed=%.2fs", time.perf_counter() - t0)
 
-    # Dimension impact is downstream of Rule FAIL and independent of Gate. A local Rule
-    # FAIL may remain visible in issues while the whole dimension stays 达标.
-    agg["dimension_states"] = feedback.get("dimension_assessments", agg["dimension_states"])
-    logger.info("[review] dimension_impact states=%s", agg["dimension_states"])
+    # Gate has no independent editorial logic. Release state is a deterministic
+    # projection of Dimension: all dimensions 达标 => 可以继续; otherwise 需要修改.
+    dimension_states = dimension_result["dimension_states"]
+    final_judgement = dimension_result["final_judgement"]
+
+    # Product consistency invariant: a blocked finished draft must expose at least one
+    # Rule-grounded issue. If the model clusterer returned none, deterministic clusters
+    # are used rather than showing "需要修改" with an empty issue list.
+    if final_judgement == "需要修改" and not feedback.get("issue_candidates"):
+        feedback = deterministic_feedback_fallback(eval_result)
 
     # Positive feedback is produced by its own PASS-grounded extractor, never by the
     # negative Feedback Composer. It cannot change Gate/final judgement.
@@ -887,13 +955,13 @@ async def review_article(
     result = {
         "review_id": str(uuid.uuid4()),
         "content_type": content_type,
-        "final_judgement": agg["final_judgement"],
-        "dimension_states": agg["dimension_states"],
+        "final_judgement": final_judgement,
+        "dimension_states": dimension_states,
         "core_diagnosis": core_text,
         "issues": feedback.get("issue_candidates", []),
         "strengths": feedback.get("strengths", []),
         "unresolved_rules": eval_result.get("unresolved_rules", []),
-        "failed_rule_ids": agg["failed_rule_ids"],
+        "failed_rule_ids": [x.get("rule_id") for x in eval_result.get("failed_rules", [])],
         "model_provider": settings.llm_provider,
         "model": settings.llm_model or "mock",
         "registry_hash": registry_hash(),
