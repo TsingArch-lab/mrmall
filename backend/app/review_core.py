@@ -569,7 +569,7 @@ def deterministic_feedback_fallback(eval_result: dict[str, Any]) -> dict[str, An
             text = f"{reg[rid]['name']}：{f.get('match_explanation', '')}"
             ev = f.get("article_evidence", []) or ev
         else:
-            text = f"{c.get('cluster_hint', '同源问题')}：多个已 FAIL Rules 指向同一上游问题。"
+            text = str(c.get('cluster_hint', '多个问题来自同一原因')).strip() or '多个问题来自同一原因'
         if ev:
             issues.append({"text": text, "supporting_rule_ids": ids, "article_evidence": ev})
 
@@ -678,7 +678,7 @@ async def compose_feedback(article: str, eval_result: dict[str, Any], verificati
     })
     try:
         raw = await provider.generate_json(
-            "你是 PROBLEM_CLUSTERER。只能把已 FAIL Rules 聚合成同源作者问题。不得判断五维、不得判断是否发布、不得新增审稿标准。只输出指定 JSON。",
+            "你是 PROBLEM_CLUSTERER。内部只依据已确认的负面规则结果聚合同源作者问题；不得判断五维、不得判断是否发布、不得新增审稿标准。输出给作者的 text/core_diagnosis 中禁止出现 Rule、Rules、FAIL、PASS、BLOCKER、severity、Gate 等系统术语。只输出指定 JSON。",
             user,
         )
         failed_ids = {x.get("rule_id") for x in failed if x.get("rule_id")}

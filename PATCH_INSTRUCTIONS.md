@@ -1,24 +1,22 @@
-# PATCH INSTRUCTIONS — v0.1.12.0
+# Mall Content OS v0.1.13.0 Patch Instructions
 
-Apply this patch on top of the deployed v0.1.11.0 runtime.
+Base: v0.1.12.0
 
-Overwrite these files at the repository root:
+Upload/overwrite these files at the same relative paths:
 
-1. `backend/app/review_core.py`
-2. `core/review_core/portable/prompts/06_dimension_gate_evaluator.md`
+- `backend/app/review_core.py`
+- `core/review_core/portable/prompts/02_feedback_composer.md`
+- `core/review_core/portable/prompts/06_dimension_gate_evaluator.md`
+- `frontend/app.js`
 
-Optional documentation:
-- `RUNTIME_CHANGELOG_v0.1.12.0.md`
+Then redeploy backend and frontend if your platform does not auto-deploy on commit.
 
-Then redeploy Render. No environment-variable changes are required, provided your existing secondary model is `deepseek-v4-flash`.
+## What changed
 
-Expected runtime behavior after deployment:
-- Router logs should use the secondary model internally.
-- Main `evaluate_rules` remains on primary/Pro.
-- Targeted UNRESOLVED and fact-sensitive adjudication use secondary/Flash.
-- `dimension_gate` still uses Flash, but Dimension ownership is now fixed by Rule stage and cannot spread a FAIL into unrelated Dimensions.
+1. Frontend no longer displays Rule IDs / Rule detail under problems or strengths.
+2. Frontend author-facing text no longer uses `FAIL Rule`, `PASS`, `BLOCKER`, `Gate` and similar internal terminology.
+3. When fact verification is not run, frontend only shows: `外部事实核验未执行。`
+4. Dimension calibration is stricter about release threshold: a single non-BLOCKER local FAIL does not by itself make the whole Dimension fail. The Dimension becomes `有明显问题` only when the confirmed issue reaches the core/major scope or requires substantive rework.
+5. Backend provenance (`supporting_rule_ids`) is preserved unchanged for logs/debugging; only frontend rendering hides it.
 
-Recommended regression order:
-1. 陆家嘴：verify not all five Dimensions turn red merely because many FAILs exist.
-2. 消费动机：especially watch 表达质量; X002 alone should not automatically make the whole Dimension fail unless its impact is substantial.
-3. OPPO：verify a 0-FAIL good draft still returns all Dimensions 达标 / 可以继续.
+No changes to Rules, Rule Evaluator, fixed Rule→Dimension ownership, Gate derivation, Router/Adjudicator model split, Fact Search, or Strength eligibility.

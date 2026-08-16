@@ -62,20 +62,20 @@ function render(d){
   $('meta').innerHTML = `类型 ${esc(d.content_type)}<br>Provider ${esc(d.model_provider)} / ${esc(d.model)}<br>Rules ${esc(d.registry_hash.slice(0,22))}…<br>Web ${esc(APP_VERSION)}`;
   $('dimensions').innerHTML = Object.entries(d.dimension_states).map(([k,v])=>`<div class="dim"><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   if(d.core_diagnosis){$('diagnosisWrap').classList.remove('hidden');$('diagnosis').textContent=d.core_diagnosis}else{$('diagnosisWrap').classList.add('hidden')}
-  $('issues').innerHTML = d.issues.length ? d.issues.map((x,i)=>`<div class="issue"><strong>${i+1}. ${esc(x.text)}</strong><div class="rule">Rule: ${esc((x.supporting_rule_ids||[]).join(', '))}</div>${(x.article_evidence||[]).map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('')}</div>`).join('') : '<p>当前 Rules 未生成负面问题。</p>';
+  $('issues').innerHTML = d.issues.length ? d.issues.map((x,i)=>`<div class="issue"><strong>${i+1}. ${esc(x.text)}</strong>${(x.article_evidence||[]).map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('')}</div>`).join('') : '<p>当前未发现需要修改的问题。</p>';
   renderVerification(d);
   const strengthHtml=(d.strengths||[]).map(x=>{
     if(typeof x === 'string') return x.trim() ? `<li>${esc(x)}</li>` : '';
     if(!x || typeof x !== 'object') return '';
     const text=String(x.text||x.summary||x.title||'').trim();
     if(!text) return '';
-    const rules=Array.isArray(x.supporting_rule_ids)&&x.supporting_rule_ids.length ? `<div class="rule">Rule: ${esc(x.supporting_rule_ids.join(', '))}</div>` : '';
+    const rules='';
     const evs=Array.isArray(x.article_evidence)?x.article_evidence:[];
     const evidence=evs.map(ev=>`<div class="evidence">${esc(ev)}</div>`).join('');
     return `<li><strong>${esc(text)}</strong>${rules}${evidence}</li>`;
   }).filter(Boolean).join('');
   $('strengths').innerHTML = strengthHtml || '<li>当前 PASS Rules 未提取出足以在后续修改中主动保护的内容资产。</li>';
-  if(d.verification_note){$('verifyNote').classList.remove('hidden');$('verifyNote').textContent=d.verification_note}else{$('verifyNote').classList.add('hidden')}
+  if(d.verification_note){$('verifyNote').classList.remove('hidden');const n=String(d.verification_note);$('verifyNote').textContent=n.startsWith('外部事实核验未执行')?'外部事实核验未执行。':n}else{$('verifyNote').classList.add('hidden')}
   $('result').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
