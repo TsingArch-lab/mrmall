@@ -1,27 +1,24 @@
-# Mall Content OS v0.1.11.0 Patch Instructions
+# PATCH INSTRUCTIONS — v0.1.12.0
 
-Base requirement: deploy on top of the currently running v0.1.10.0 + FAIL-FIRST runtime.
+Apply this patch on top of the deployed v0.1.11.0 runtime.
 
-Copy/overwrite these files using the same relative paths:
+Overwrite these files at the repository root:
 
 1. `backend/app/review_core.py`
-2. `core/review_core/portable/prompts/01_rule_batch_evaluator.md`
-3. `core/review_core/portable/prompts/02_feedback_composer.md`
-4. `core/review_core/portable/prompts/06_dimension_gate_evaluator.md` (new file)
-5. `RUNTIME_CHANGELOG_v0.1.11.0.md` (new documentation file)
+2. `core/review_core/portable/prompts/06_dimension_gate_evaluator.md`
 
-No environment-variable changes are required.
-No Rules or compiled Registry files are changed.
-No Gate Registry file is changed; legacy gate_registry remains only for selecting applicable Rules, not for final release aggregation.
+Optional documentation:
+- `RUNTIME_CHANGELOG_v0.1.12.0.md`
 
-After commit/push and Render redeploy, verify logs contain:
-- `[review] rule_results final failed_ids=...`
-- `[review] problem_clusterer start ...`
-- `[review] dimension_gate start ... input_failed_ids=...`
-- `[review] dimension_gate done ... final=... states=...`
+Then redeploy Render. No environment-variable changes are required, provided your existing secondary model is `deepseek-v4-flash`.
 
-Expected product invariant:
-- all dimensions 达标 -> 可以继续
-- any dimension 有明显问题 -> 需要修改
-- BLOCKER FAIL -> mapped dimension 有明显问题 -> 需要修改
-- Problem Clusterer failure must not force all dimensions back to 达标.
+Expected runtime behavior after deployment:
+- Router logs should use the secondary model internally.
+- Main `evaluate_rules` remains on primary/Pro.
+- Targeted UNRESOLVED and fact-sensitive adjudication use secondary/Flash.
+- `dimension_gate` still uses Flash, but Dimension ownership is now fixed by Rule stage and cannot spread a FAIL into unrelated Dimensions.
+
+Recommended regression order:
+1. 陆家嘴：verify not all five Dimensions turn red merely because many FAILs exist.
+2. 消费动机：especially watch 表达质量; X002 alone should not automatically make the whole Dimension fail unless its impact is substantial.
+3. OPPO：verify a 0-FAIL good draft still returns all Dimensions 达标 / 可以继续.

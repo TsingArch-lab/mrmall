@@ -50,6 +50,9 @@ STRENGTH_ANCHOR_RULE_IDS = {
     "S001", "S002", "S005", "S101", "S201", "S301",
 }
 
+# Fixed primary-dimension ownership by Rule stage. Dimension ownership is structural,
+# not inferred by the model at runtime. FINAL meta rules F001/F002 are excluded; F003
+# is a judgement-quality rule and therefore belongs to 观点质量.
 DIM_MAP = {
     "TOPIC": "选题价值",
     "EVIDENCE": "证据支撑",
@@ -57,7 +60,7 @@ DIM_MAP = {
     "INSIGHT": "观点质量",
     "STRUCTURE": "结构逻辑",
     "EXPRESSION": "表达质量",
-    "FINAL": "表达质量",
+    "FINAL": "观点质量",
 }
 
 # FINAL meta rules are deterministic summaries of upstream execution state, not fresh
@@ -170,7 +173,8 @@ async def _schema_repair(
 
 
 async def route_content_type(article: str) -> str:
-    provider = get_provider()
+    # Routing is a bounded classification task; use the secondary/Flash model.
+    provider = get_provider(secondary=True)
     prompt = (PROMPTS / "04_router.md").read_text(encoding="utf-8")
 
     # First attempt.
@@ -278,7 +282,8 @@ async def evaluate_rule_subset(article: str, content_type: str, verification_con
             "ARTICLE": article,
         },
     )
-    provider = get_provider()
+    # Fact-sensitive recheck is a bounded subset judgement; use Flash.
+    provider = get_provider(secondary=True)
     raw = await provider.generate_json(
         "你是 FACT_SENSITIVE_RULE_ADJUDICATOR。只执行输入的事实敏感 Rules，不得重审其他规则。",
         user,
@@ -356,7 +361,8 @@ async def adjudicate_unresolved(
         },
     )
 
-    provider = get_provider()
+    # UNRESOLVED adjudication is narrow and fail-safe; use Flash.
+    provider = get_provider(secondary=True)
     raw = await provider.generate_json(
         "你是 TARGETED_ADJUDICATOR。只复核输入的 UNRESOLVED Rules，不得重审其他规则。",
         user,
@@ -452,6 +458,14 @@ def dimension_fail_context(eval_result: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def dimension_fail_groups(eval_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Group confirmed FAILs by their fixed primary Dimension ownership."""
+    groups = {dim: [] for dim in FIXED_DIMENSIONS}
+    for item in dimension_fail_context(eval_result):
+        groups[item["dimension"]].append(item)
+    return groups
+
+
 def deterministic_dimension_fallback(eval_result: dict[str, Any]) -> dict[str, Any]:
     """Conservative fail-safe when the secondary Dimension Evaluator is unavailable."""
     dims = {k: "达标" for k in FIXED_DIMENSIONS}
@@ -509,12 +523,11 @@ async def evaluate_dimensions_and_gate(article: str, content_type: str, eval_res
     prompt = prompt_path.read_text(encoding="utf-8")
     user = _render(prompt, {
         "CONTENT_TYPE": content_type,
-        "DIMENSION_FAIL_CONTEXT": ctx,
-        "ARTICLE": article,
+        "DIMENSION_FAIL_GROUPS": dimension_fail_groups(eval_result),
     })
     provider = get_provider(secondary=True)
     raw = await provider.generate_json(
-        "你是 DIMENSION_EVALUATOR。你只能判断已确认 FAIL 对五维成稿质量的影响；不得重新判 Rule，不得新增问题。BLOCKER 必须使其对应维度为有明显问题。只输出指定 JSON。",
+        "你是 DIMENSION_EVALUATOR。Rule 所属维度已由系统固定分类。你只能在每条 Rule 已分配的唯一维度内判断影响程度，不得跨维度扩散，不得重新判 Rule，不得新增问题。BLOCKER 必须使其所属维度为有明显问题。只输出指定 JSON。",
         user,
     )
     return validate_dimension_result(raw, eval_result)
