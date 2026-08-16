@@ -25,10 +25,10 @@ class Settings:
     # If omitted, secondary stages reuse LLM_MODEL.
     llm_model_secondary: str = os.getenv("LLM_MODEL_SECONDARY", "")
     llm_secondary_timeout_seconds: float = float(os.getenv("LLM_SECONDARY_TIMEOUT_SECONDS", "90"))
-    llm_evaluator_stage_timeout_seconds: float = float(os.getenv("LLM_EVALUATOR_STAGE_TIMEOUT_SECONDS", "240"))
+    llm_evaluator_stage_timeout_seconds: float = float(os.getenv("LLM_EVALUATOR_STAGE_TIMEOUT_SECONDS", "360"))
     llm_router_stage_timeout_seconds: float = float(os.getenv("LLM_ROUTER_STAGE_TIMEOUT_SECONDS", "90"))
     llm_adjudicator_stage_timeout_seconds: float = float(os.getenv("LLM_ADJUDICATOR_STAGE_TIMEOUT_SECONDS", "90"))
-    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
+    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "330"))
     llm_http_retries: int = int(os.getenv("LLM_HTTP_RETRIES", "2"))
     llm_debug_raw_response: bool = _bool_env("LLM_DEBUG_RAW_RESPONSE", False)
     llm_debug_max_chars: int = int(os.getenv("LLM_DEBUG_MAX_CHARS", "1200"))
