@@ -207,7 +207,7 @@ async def evaluate_rules(article: str, content_type: str, verification_context):
     )
 
     raw = await provider.generate_json(
-        "你是严格的 RULE_BATCH_EVALUATOR。只能执行输入 Rules，必须严格按指定 JSON 契约输出。",
+        "你是严格的 RULE_BATCH_EVALUATOR。只能执行输入 Rules。必须逐条遵守提示中的 FAIL-FIRST 决策树：先查 fail_condition，再查 pass_condition，并按冲突裁决原则决定 PASS/FAIL/NA/UNRESOLVED。不得用局部 PASS 理由覆盖已经成立的 FAIL。必须严格按指定 JSON 契约输出。",
         user,
     )
     try:
@@ -368,6 +368,12 @@ async def adjudicate_unresolved(
 
 
 def aggregate(eval_result: dict[str, Any]):
+    """Deterministic Gate aggregation only.
+
+    Important: a Rule FAIL is a local/criterion-level judgement. It must NOT
+    automatically downgrade the whole author-facing quality dimension. Dimension
+    impact is assessed separately downstream, using only already-validated FAIL Rules.
+    """
     reg = rules_by_id()
     fails = eval_result.get("failed_rules", [])
     fail_ids = [x["rule_id"] for x in fails]
@@ -386,20 +392,41 @@ def aggregate(eval_result: dict[str, Any]):
             revise = True
 
     final = "需要修改" if revise else "可以继续"
+
+    # Neutral baseline only. These are NOT inferred from PASS/FAIL here.
+    # The Feedback/Dimension stage may downgrade a dimension only when validated
+    # FAIL Rules mapped to that dimension have material whole-dimension impact.
     dims = {
         k: "达标"
         for k in ["选题价值", "证据支撑", "观点质量", "结构逻辑", "表达质量"]
     }
-    for rid in fail_ids:
-        stage = reg[rid]["stage"]
-        dim = DIM_MAP.get(stage)
-        if dim:
-            dims[dim] = "有明显问题"
     return {
         "final_judgement": final,
         "dimension_states": dims,
         "failed_rule_ids": fail_ids,
     }
+
+
+def dimension_fail_context(eval_result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build provenance for dimension impact assessment from FAIL Rules only."""
+    reg = rules_by_id()
+    out: list[dict[str, Any]] = []
+    for item in eval_result.get("failed_rules", []):
+        rid = item.get("rule_id")
+        rule = reg.get(rid, {})
+        dim = DIM_MAP.get(rule.get("stage"))
+        if not dim:
+            continue
+        out.append({
+            "rule_id": rid,
+            "name": rule.get("name"),
+            "stage": rule.get("stage"),
+            "dimension": dim,
+            "severity": rule.get("severity"),
+            "article_evidence": item.get("article_evidence", []),
+            "match_explanation": item.get("match_explanation", ""),
+        })
+    return out
 
 
 def validate_feedback(
@@ -411,6 +438,22 @@ def validate_feedback(
 
     if feedback.get("final_judgement") != expected_final:
         raise ValueError("Feedback Composer attempted to change deterministic final_judgement")
+
+    # Dimension impact is a separate layer from Rule FAIL and Gate. It may only
+    # downgrade a dimension that has at least one validated FAIL Rule mapped to it.
+    expected_dims = ["选题价值", "证据支撑", "观点质量", "结构逻辑", "表达质量"]
+    dims = feedback.get("dimension_assessments", {})
+    if set(dims.keys()) != set(expected_dims):
+        raise ValueError("dimension_assessments must contain exactly the five fixed dimensions")
+    if any(v not in {"达标", "有明显问题"} for v in dims.values()):
+        raise ValueError("dimension_assessments contains unsupported state")
+
+    mapped_failed_dims = {x["dimension"] for x in dimension_fail_context(eval_result)}
+    for dim, state in dims.items():
+        if state == "有明显问题" and dim not in mapped_failed_dims:
+            raise ValueError(
+                f"Dimension provenance violation: {dim} downgraded without a mapped FAIL Rule"
+            )
 
     core = feedback.get("core_diagnosis")
     issues = feedback.get("issue_candidates", [])
@@ -581,12 +624,26 @@ async def compose_feedback(
 
     provider = get_provider(secondary=True)
     prompt = (PROMPTS / "02_feedback_composer.md").read_text(encoding="utf-8")
-    user = _render(prompt, {"FINAL_JUDGEMENT":agg["final_judgement"],"DIMENSION_STATES":agg["dimension_states"],"FAILED_RULES_ONLY":failed,"FAILED_RULE_CLUSTERS":clusters,"VERIFICATION_RESULTS":verification_results,"PASSED_STRENGTH_CANDIDATES":[]})
+    dim_fail_context = dimension_fail_context(eval_result)
+    user = _render(prompt, {
+        "FINAL_JUDGEMENT": agg["final_judgement"],
+        "DIMENSION_STATES": agg["dimension_states"],
+        "DIMENSION_FAIL_CONTEXT": dim_fail_context,
+        "FAILED_RULES_ONLY": failed,
+        "FAILED_RULE_CLUSTERS": clusters,
+        "VERIFICATION_RESULTS": verification_results,
+        "PASSED_STRENGTH_CANDIDATES": [],
+    })
     try:
-        raw = await provider.generate_json("你是 FEEDBACK_COMPOSER。不得新增审稿标准；不得修改程序最终判断。作者端优先按 FAILED_RULE_CLUSTERS 合并同源问题；不得一 Rule 一问题；不得把 Gate 后果、severity 或 BLOCKER 本身写成独立问题。", user)
+        raw = await provider.generate_json(
+            "你是 FEEDBACK_COMPOSER_AND_DIMENSION_ASSESSOR。不得新增审稿标准；不得修改程序最终判断。"
+            "Rule FAIL 只表示具体规则被违反，不自动等于整个维度有明显问题。"
+            "五维只能依据已验证 FAIL Rules 的影响范围做二次聚合；没有对应 FAIL Rule 的维度必须保持达标。"
+            "作者端优先按 FAILED_RULE_CLUSTERS 合并同源问题；不得一 Rule 一问题；不得把 Gate 后果、severity 或 BLOCKER 本身写成独立问题。",
+            user,
+        )
         feedback = normalize_feedback(raw)
         feedback["final_judgement"] = agg["final_judgement"]
-        feedback["dimension_assessments"] = agg["dimension_states"]
         validate_feedback(feedback, eval_result, agg["final_judgement"])
         return feedback
     except Exception as exc:
@@ -814,6 +871,11 @@ async def review_article(
     logger.info("[review] postprocess_parallel start")
     strengths, feedback = await asyncio.gather(_strength_stage(), _feedback_stage())
     logger.info("[review] postprocess_parallel done elapsed=%.2fs", time.perf_counter() - t0)
+
+    # Dimension impact is downstream of Rule FAIL and independent of Gate. A local Rule
+    # FAIL may remain visible in issues while the whole dimension stays 达标.
+    agg["dimension_states"] = feedback.get("dimension_assessments", agg["dimension_states"])
+    logger.info("[review] dimension_impact states=%s", agg["dimension_states"])
 
     # Positive feedback is produced by its own PASS-grounded extractor, never by the
     # negative Feedback Composer. It cannot change Gate/final judgement.
